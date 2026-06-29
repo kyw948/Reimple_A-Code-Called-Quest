@@ -1,0 +1,8 @@
+[project]
+name = "python-basic"
+version = "0.1.0"
+description = "Sample repo for coding practice tool"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

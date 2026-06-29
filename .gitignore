@@ -1,0 +1,40 @@
+# env / secrets
+.env
+*.env
+backend/.env
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+backend/.venv/
+
+# db
+*.db
+*.sqlite
+*.sqlite3
+backend/app.db
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+
+# local outputs
+practice_output/
+backend/practice_output/
+repos/
+generated/
+.codepractice/
+
+# logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
