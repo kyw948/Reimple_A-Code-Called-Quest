@@ -7,6 +7,7 @@ from sqlalchemy import select, update
 from app.core.errors import AppError
 from app.db.database import engine, projects
 from app.services import llm_client
+from app.services.paper_parser import save_relevant_figures_for_project
 
 
 PAPER_OVERALL_PLAN_SYSTEM = """너는 AI 논문을 코드로 구현하는 전문가이다.
@@ -44,11 +45,12 @@ def plan_paper_project(project_id: str, payload: PaperPlanRequest | None = None)
     cached_logic = _loads(project["dependency_graph"])
     if (
         not payload.force
-        and project["analysis_status"] in {"planned", "completed"}
+        and project["analysis_status"] in {"planned", "completed", "code_generated"}
         and cached_overall
         and cached_architecture
         and cached_logic
     ):
+        _render_and_store_figures(project_id, project, cached_overall)
         return PaperPlanResponse(
             status="planned",
             overall_plan=cached_overall,
@@ -59,7 +61,13 @@ def plan_paper_project(project_id: str, payload: PaperPlanRequest | None = None)
     _update_project(project_id, analysis_status="planning")
 
     overall_plan = _run_overall_plan(project)
-    _update_project(project_id, project_summary=json.dumps(overall_plan, ensure_ascii=False))
+    figure_count = _render_and_store_figures(project_id, project, overall_plan)
+    project_summary_values = {"project_summary": json.dumps(overall_plan, ensure_ascii=False)}
+    if figure_count:
+        metadata = _loads(project["paper_metadata"])
+        metadata["figure_count"] = figure_count
+        project_summary_values["paper_metadata"] = json.dumps(metadata, ensure_ascii=False)
+    _update_project(project_id, **project_summary_values)
 
     architecture = _run_architecture_design(project, overall_plan)
     _update_project(project_id, architecture=json.dumps(architecture, ensure_ascii=False))
@@ -134,6 +142,7 @@ def _run_architecture_design(project, overall_plan: dict[str, Any]) -> dict[str,
 
 JSON으로 응답:
 {{
+  "architecture_flow": "Input Image ? Patch Embedding ? Encoder Block ? N ? Classification Head ? Output",
   "files": [
     {{
       "path": "models/attention.py",
@@ -211,6 +220,18 @@ def _call_planning_step(prompt: str, system_instruction: str, required_fields: d
     if isinstance(last_error, AppError):
         raise last_error
     raise AppError("PAPER_PLAN_FAILED", f"{step_name} 생성에 실패했습니다. LLM 응답 형식을 확인하세요.")
+
+
+def _render_and_store_figures(project_id: str, project, overall_plan: dict[str, Any]) -> int:
+    try:
+        figure_count = save_relevant_figures_for_project(project_id, overall_plan)
+    except Exception:
+        return 0
+    if figure_count:
+        metadata = _loads(project["paper_metadata"])
+        metadata["figure_count"] = figure_count
+        _update_project(project_id, paper_metadata=json.dumps(metadata, ensure_ascii=False))
+    return figure_count
 
 
 def _get_project(project_id: str):

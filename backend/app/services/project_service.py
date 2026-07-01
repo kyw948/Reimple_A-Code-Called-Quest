@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, insert, select, update
 
 from app.core.errors import AppError
 from app.db.database import engine, files, projects
+from app.services.paper_parser import promote_figures_for_project
 from app.services.repo_analyzer import EXCLUDED_NAMES
 
 
@@ -97,6 +98,14 @@ def create_project(payload: ProjectCreateRequest) -> ProjectCreateResponse:
     project_id = str(uuid.uuid4())
     now = _utc_now()
 
+    paper_metadata = dict(payload.paper_metadata or {})
+    figure_count = 0
+    if is_paper_project:
+        figure_count = promote_figures_for_project(project_id, paper_metadata.get("figure_token"))
+        if figure_count:
+            paper_metadata["figure_count"] = figure_count
+        paper_metadata.pop("figure_token", None)
+
     with engine.begin() as connection:
         connection.execute(
             insert(projects).values(
@@ -109,7 +118,7 @@ def create_project(payload: ProjectCreateRequest) -> ProjectCreateResponse:
                 paper_title=payload.paper_title,
                 paper_abstract=payload.paper_abstract,
                 paper_content=payload.paper_content,
-                paper_metadata=json.dumps(payload.paper_metadata or {}, ensure_ascii=False),
+                paper_metadata=json.dumps(paper_metadata, ensure_ascii=False),
                 generated_repo_path=None,
                 analysis_status="pending",
                 created_at=now,
@@ -179,12 +188,14 @@ def update_project(project_id: str, payload: ProjectUpdateRequest) -> ProjectUpd
 
 def setup_project(project_id: str) -> ProjectSetupResponse:
     project = _get_project_row(project_id)
-    if project["paper_source"]:
+    if project["paper_source"] and not project["repo_path"]:
         return ProjectSetupResponse(copied_files=0, skipped_files=0)
 
     repo_path = Path(project["repo_path"])
     practice_root_path = Path(project["practice_root_path"])
     target_extensions = set(json.loads(project["target_extensions"]))
+    if project["paper_source"] and not target_extensions:
+        target_extensions = {".py"}
 
     copied_files = 0
     skipped_files = 0

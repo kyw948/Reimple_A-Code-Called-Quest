@@ -441,6 +441,7 @@ def test_generate_paper_code_background(client, tmp_path, monkeypatch):
     assert status is not None
     assert status["status"] == "completed"
     assert status["generated_files"] == 2
+    assert status["completed_files"] == ["config.py", "models/embedding.py"]
     assert "config.py" in status["files"]
     assert "models/embedding.py" in status["files"]
 
@@ -449,6 +450,11 @@ def test_generate_paper_code_background(client, tmp_path, monkeypatch):
     assert Path(detail["repo_path"]).exists()
     assert detail["generated_repo_path"] == detail["repo_path"]
     assert (Path(detail["repo_path"]) / "models" / "embedding.py").exists()
+
+    setup = client.post(f"/api/projects/{project_id}/setup")
+    assert setup.status_code == 200
+    after_setup = client.get(f"/api/projects/{project_id}").json()
+    assert after_setup["file_counts"]["target"] >= 2
 
 
 def test_generate_paper_code_requires_plan(client, tmp_path, monkeypatch):
@@ -797,8 +803,10 @@ def test_warmup_questions(client, practice_root, monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["questions"][0]["id"] == 0
-    assert body["questions"][0]["answer"] == 1
-    assert len(body["questions"][0]["options"]) == 4
+    question = body["questions"][0]
+    assert 0 <= question["answer"] < len(question["options"])
+    assert question["options"][question["answer"]] == "forward"
+    assert len(question["options"]) == 4
 
 
 def test_assess_status_and_background_start(client, practice_root, monkeypatch):

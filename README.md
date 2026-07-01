@@ -1,27 +1,40 @@
-﻿# CodePractice
+# Reimple
+> a code called quest
 
-濡쒖뺄 repo瑜?肄붾뵫 ?곗뒿 ?꾨줈?앺듃濡?蹂?섑븯???깆씠??
+AI 논문과 코드 repository를 재구현하면서 배우는 코딩 연습 도구.
 
-## 援ъ“
+## 빠른 시작
+
+### 요구사항
+- Python 3.10+
+- Node.js 18+
+- Git
+
+### 실행
+```powershell
+# Windows
+./start.ps1
 ```
-backend/     - FastAPI ?쒕쾭
-frontend/    - React ??samples/     - ?뚯뒪?몄슜 ?섑뵆 repo
-docs/        - ?ㅺ퀎 臾몄꽌
-```
 
-## ?ㅽ뻾
 ```bash
-# Backend
-cd backend
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install fastapi uvicorn pydantic sqlalchemy pytest pytest-json-report python-multipart
-uvicorn app.main:app --reload --port 8000
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+# Mac/Linux
+chmod +x start.sh
+./start.sh
 ```
 
-釉뚮씪?곗??먯꽌 http://localhost:5173 ?묒냽
+브라우저에서 `http://localhost:5173` 접속.
+
+### Gemini API 키
+LLM 기능(파일 분석, 채점, 힌트)을 사용하려면 [Google AI Studio](https://aistudio.google.com/)에서 API 키를 발급받아 `backend/.env`에 설정.
+
+## 사용법
+
+### 코드 기반 (GitHub repo)
+1. GitHub URL 또는 로컬  입력
+2. 프로젝트 분석 → 문제 트리 생성
+3. 함수 단위로 코딩 연습
+
+### 논문 기반 (arXiv / PDF)
+1. arXiv URL 또는 PDF 업로드
+2. Paper2Code 방식으로 참조 코드 생성
+3. 생성된 코드 기반으로 코딩 연습

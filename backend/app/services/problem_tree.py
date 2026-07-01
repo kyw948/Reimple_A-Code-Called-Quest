@@ -68,7 +68,7 @@ def prepare_practice(project_id: str) -> PracticePrepareResponse:
         source_path = row["source_path"]
         for symbol in _loads_list_of_dicts(row["recommended_symbols"]):
             target_symbol = str(symbol.get("symbol") or "").strip()
-            if not target_symbol:
+            if not target_symbol or _is_init_symbol(target_symbol):
                 continue
             existing_problem = existing.get((source_path, target_symbol))
             depth = _symbol_depth(dependency_graph, source_path, target_symbol)
@@ -99,10 +99,40 @@ def prepare_practice(project_id: str) -> PracticePrepareResponse:
                 )
             )
 
+    candidates = _deduplicate_practice_candidates(candidates)
     return PracticePrepareResponse(
         modules=_prepare_modules(project_id, candidates),
         candidates=sorted(candidates, key=lambda item: (item.depth, item.source_path, item.symbol)),
     )
+
+
+def _deduplicate_practice_candidates(candidates: list[PracticeCandidate]) -> list[PracticeCandidate]:
+    seen: dict[str, PracticeCandidate] = {}
+    for candidate in candidates:
+        if _is_init_symbol(candidate.symbol):
+            continue
+        key = _normalized_symbol_key(candidate.symbol)
+        current = seen.get(key)
+        if current is None or _practice_candidate_priority(candidate) < _practice_candidate_priority(current):
+            seen[key] = candidate
+    return list(seen.values())
+
+
+def _practice_candidate_priority(candidate: PracticeCandidate) -> tuple[int, int, int]:
+    normalized = candidate.source_path.replace("\\", "/").lower()
+    path_depth = normalized.count("/")
+    monolithic_penalty = 1 if normalized.endswith(("model.py", "models.py", "network.py", "networks.py")) else 0
+    return (monolithic_penalty, path_depth, len(candidate.source_path))
+
+
+def _normalized_symbol_key(symbol: str) -> str:
+    parts = [part.strip("_") for part in symbol.split(".")]
+    return ".".join(parts).lower()
+
+
+def _is_init_symbol(symbol: str) -> bool:
+    normalized = _normalized_symbol_key(symbol)
+    return normalized == "init" or normalized.endswith(".init")
 
 
 def create_module_groups(project_id: str) -> list[dict]:
@@ -380,9 +410,7 @@ def _candidate_status(project_id: str, depth: int, depends_on: list[str]) -> str
         matched = [
             row
             for row in rows
-            if row["target_symbol"] == dependency
-            or row["target_symbol"].endswith(f".{dependency}")
-            or dependency.endswith(row["target_symbol"])
+            if _symbols_match(str(row["target_symbol"]), dependency)
         ]
         if not matched or not any(row["status"] == "passed" for row in matched):
             return "locked"
@@ -390,12 +418,20 @@ def _candidate_status(project_id: str, depth: int, depends_on: list[str]) -> str
 
 
 def _dependency_is_skipped(dependency: str, statuses: dict[str, str]) -> bool:
+    if _is_init_symbol(dependency):
+        return True
     for symbol, status in statuses.items():
         if status not in {"skipped", "error"}:
             continue
-        if symbol == dependency or symbol.endswith(f".{dependency}") or dependency.endswith(symbol):
+        if _symbols_match(symbol, dependency):
             return True
     return False
+
+
+def _symbols_match(left: str, right: str) -> bool:
+    left_key = _normalized_symbol_key(left)
+    right_key = _normalized_symbol_key(right)
+    return left_key == right_key or left_key.endswith(f".{right_key}") or right_key.endswith(left_key)
 
 
 def _recommended_symbol_statuses(project_id: str) -> dict[str, str]:

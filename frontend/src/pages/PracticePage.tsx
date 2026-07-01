@@ -8,6 +8,7 @@ import { useParams } from "react-router-dom";
 import { apiClient } from "../api/client";
 import {
   Candidate,
+  CurrentProject,
   CandidateApiItem,
   Module,
   Problem,
@@ -73,6 +74,47 @@ type AssessStatus = {
   candidates?: CandidateApiItem[];
 };
 
+type ArchitectureFile = {
+  path: string;
+  description?: string;
+  classes?: string[];
+  functions?: string[];
+  depends_on?: string[];
+};
+
+type ProjectArchitectureResponse = {
+  id: string;
+  repo_path: string;
+  practice_root_path: string;
+  target_extensions: string[];
+  paper_source?: "arxiv" | "pdf" | null;
+  paper_title?: string | null;
+  paper_abstract?: string | null;
+  paper_metadata?: {
+    figure_count?: number;
+  };
+  project_summary?: {
+    project_summary?: string;
+    summary?: string;
+    architecture_flow?: string[] | string;
+    architecture_figure?: number | string | null;
+    components?: Array<{
+      name?: string;
+      related_figure?: number | string | null;
+    }>;
+  };
+  architecture?: {
+    architecture_flow?: string;
+    files?: ArchitectureFile[];
+  };
+};
+
+type ArchitectureFlowItem = {
+  label: string;
+  path: string | null;
+  description: string | null;
+};
+
 const STATUS_ICON: Record<Problem["status"], string> = {
   active: "⏳",
   locked: "🔒",
@@ -106,6 +148,7 @@ export function PracticePage() {
   const refreshProblems = useProjectStore((state) => state.refreshProblems);
   const preparePractice = useProjectStore((state) => state.preparePractice);
   const setCandidates = useProjectStore((state) => state.setCandidates);
+  const setCurrentProject = useProjectStore((state) => state.setCurrentProject);
   const setCurrentProblem = useProjectStore((state) => state.setCurrentProblem);
   const setEditorCode = useProjectStore((state) => state.setEditorCode);
   const setSubmitResult = useProjectStore((state) => state.setSubmitResult);
@@ -127,11 +170,21 @@ export function PracticePage() {
   const [warmupSelections, setWarmupSelections] = useState<Record<number, number>>({});
   const [revealedWarmups, setRevealedWarmups] = useState<Set<number>>(new Set());
   const [assessProgress, setAssessProgress] = useState<AssessStatus | null>(null);
+  const [architectureFlow, setArchitectureFlow] = useState<ArchitectureFlowItem[]>([]);
+  const [paperFigureCount, setPaperFigureCount] = useState(0);
+  const [paperSummaryText, setPaperSummaryText] = useState("");
 
-  const projectTitle = useMemo(() => projectNameFromPath(currentProject?.repo_path, id), [currentProject?.repo_path, id]);
+  const projectTitle = useMemo(() => projectDisplayName(currentProject, id), [currentProject, id]);
   const selectedCandidate = useMemo(
     () => candidates.find((candidate) => candidateKey(candidate) === selectedCandidateKey) ?? null,
     [candidates, selectedCandidateKey],
+  );
+  const activeArchitectureTarget = useMemo(
+    () => ({
+      sourcePath: currentProblem?.source_path ?? selectedCandidate?.sourcePath ?? null,
+      symbol: currentProblem?.target_symbol ?? selectedCandidate?.symbol ?? null,
+    }),
+    [currentProblem?.source_path, currentProblem?.target_symbol, selectedCandidate?.sourcePath, selectedCandidate?.symbol],
   );
   const dependencyProblems = useMemo(
     () =>
@@ -167,6 +220,7 @@ export function PracticePage() {
       if (ignore) {
         return;
       }
+      console.log("[PracticePage] assess/status 폴링 결과", statusResponse.data);
       setAssessProgress(statusResponse.data);
       const nextCandidates = (statusResponse.data.candidates ?? []).map(normalizeCandidate);
       const previousCount = useProjectStore.getState().candidates.length;
@@ -202,6 +256,25 @@ export function PracticePage() {
 
       try {
         void loadWarmup();
+        const projectDetail = await apiClient.get<ProjectArchitectureResponse>(`/projects/${id}`);
+        if (!ignore) {
+          setCurrentProject({
+            id: projectDetail.data.id,
+            repo_path: projectDetail.data.repo_path,
+            practice_root_path: projectDetail.data.practice_root_path,
+            target_extensions: projectDetail.data.target_extensions,
+            paper_source: projectDetail.data.paper_source,
+            paper_title: projectDetail.data.paper_title,
+            paper_abstract: projectDetail.data.paper_abstract,
+          });
+        }
+        if (!ignore && projectDetail.data.paper_source) {
+          setArchitectureFlow(
+            buildArchitectureFlow(projectDetail.data.project_summary ?? {}, projectDetail.data.architecture ?? {}, projectDetail.data.paper_title ?? projectTitle),
+          );
+          setPaperFigureCount(projectDetail.data.paper_metadata?.figure_count ?? 0);
+          setPaperSummaryText(projectDetail.data.paper_abstract ?? "");
+        }
         const loadedCandidates = await preparePractice(id);
         const loadedProblems = await refreshProblems(id);
         if (ignore) {
@@ -224,6 +297,7 @@ export function PracticePage() {
           return;
         }
         setAssessProgress(initialStatus.data);
+        console.log("[PracticePage] assess/status 폴링 결과", initialStatus.data);
         const initialCandidates = (initialStatus.data.candidates ?? []).map(normalizeCandidate);
         console.log(`[poll] received ${initialCandidates.length} candidates, prev was ${useProjectStore.getState().candidates.length}`);
         setCandidates(initialCandidates);
@@ -234,6 +308,7 @@ export function PracticePage() {
           }
         } else {
           if (initialStatus.data.status === "pending" || initialStatus.data.status.startsWith("error")) {
+            console.log("[PracticePage] assess/start 호출");
             await apiClient.post(`/projects/${id}/assess/start`);
           }
           intervalId = window.setInterval(() => {
@@ -260,7 +335,7 @@ export function PracticePage() {
         window.clearInterval(intervalId);
       }
     };
-  }, [id, preparePractice, refreshProblems, setCandidates, setCurrentProblem, setEditorCode, setSubmitResult]);
+  }, [id, preparePractice, refreshProblems, setCandidates, setCurrentProject, setCurrentProblem, setEditorCode, setSubmitResult]);
 
   useEffect(() => {
     let ignore = false;
@@ -471,6 +546,9 @@ export function PracticePage() {
       <aside className={isFileMenuOpen ? "problem-sidebar open" : "problem-sidebar"}>
         <ProgressBar title={projectTitle} progress={overallProgress} />
         {assessProgress ? <AssessProgressPanel progress={assessProgress} onRetry={handleRetryDeferred} /> : null}
+        {paperSummaryText || (paperFigureCount > 0 && id) ? (
+          <PaperExplanationPanel summary={paperSummaryText} projectId={id ?? ""} figureCount={paperFigureCount} />
+        ) : null}
         {problems.length === 0 && candidates.length === 0 ? (
           <p className="empty-state">분석이 진행되는 동안 몸풀기 문제를 먼저 풀어보세요</p>
         ) : (
@@ -478,6 +556,7 @@ export function PracticePage() {
             modules={modules}
             problems={problems}
             candidates={candidates}
+            isAssessRunning={assessProgress?.status === "running"}
             invalidCandidateKeys={invalidCandidateKeys}
             selectedProblemId={selectedProblemId}
             selectedCandidateKey={selectedCandidateKey}
@@ -563,16 +642,21 @@ export function PracticePage() {
             </div>
           </>
         ) : (
-          <WarmupPanel
-            title={projectTitle}
-            questions={warmupQuestions}
-            selections={warmupSelections}
-            revealed={revealedWarmups}
-            onSelect={(questionId, optionIndex) =>
-              setWarmupSelections((current) => ({ ...current, [questionId]: optionIndex }))
-            }
-            onReveal={(questionId) => setRevealedWarmups((current) => new Set([...current, questionId]))}
-          />
+          <>
+            {architectureFlow.length > 0 ? (
+              <ArchitectureFlowPanel title={projectTitle} items={architectureFlow} activeTarget={activeArchitectureTarget} />
+            ) : null}
+            <WarmupPanel
+              title={projectTitle}
+              questions={warmupQuestions}
+              selections={warmupSelections}
+              revealed={revealedWarmups}
+              onSelect={(questionId, optionIndex) =>
+                setWarmupSelections((current) => ({ ...current, [questionId]: optionIndex }))
+              }
+              onReveal={(questionId) => setRevealedWarmups((current) => new Set([...current, questionId]))}
+            />
+          </>
         )}
       </section>
 
@@ -626,6 +710,69 @@ function AssessProgressPanel({ progress, onRetry }: { progress: AssessStatus; on
           ))}
         </ul>
       ) : null}
+    </section>
+  );
+}
+
+function PaperExplanationPanel({ summary, projectId, figureCount }: { summary: string; projectId: string; figureCount: number }) {
+  const [isOpen, setIsOpen] = useState(true);
+  return (
+    <section className="paper-explanation-panel">
+      <button className="paper-explanation-toggle" type="button" onClick={() => setIsOpen((open) => !open)}>
+        <strong>📖 논문 설명</strong>
+        <span>{isOpen ? "접기 ▲" : "펼치기 ▼"}</span>
+      </button>
+      {isOpen ? (
+        <div className="paper-explanation-body">
+          {summary ? <p>{summary}</p> : null}
+          {figureCount > 0 ? <PaperFigurePanel projectId={projectId} variant="sidebar" /> : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function PaperFigurePanel({ projectId, variant = "problem" }: { projectId: string; variant?: "sidebar" | "problem" }) {
+  return (
+    <section className={variant === "sidebar" ? "paper-figure-panel sidebar" : "paper-figure-panel problem"}>
+      <div className="paper-figure-header">
+        <h2>{variant === "sidebar" ? "아키텍처 Figure" : "📄 관련 Figure"}</h2>
+      </div>
+      <img src={`http://localhost:8000/api/papers/${projectId}/figures/0`} alt="논문에서 추출한 figure" loading="lazy" />
+    </section>
+  );
+}
+
+function ArchitectureFlowPanel({
+  title,
+  items,
+  activeTarget,
+}: {
+  title: string;
+  items: ArchitectureFlowItem[];
+  activeTarget: { sourcePath: string | null; symbol: string | null };
+}) {
+  const displayTitle = stripPracticeSuffix(title);
+  return (
+    <section className="architecture-flow-panel">
+      <div className="architecture-flow-header">
+        <h2>📐 {displayTitle} 아키텍처</h2>
+      </div>
+      <ol className="architecture-flow-list">
+        {items.map((item, index) => {
+          const isActive = isArchitectureNodeActive(item, activeTarget);
+          return (
+            <li key={`${item.label}:${item.path ?? index}`} className={isActive ? "active" : ""}>
+              <div className="architecture-flow-node">
+                <strong>{item.label}</strong>
+                {item.path ? <span>← {item.path}</span> : null}
+                {isActive ? <em>지금 여기! ★</em> : null}
+              </div>
+              {index < items.length - 1 ? <div className="architecture-flow-arrow">↓</div> : null}
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
@@ -739,6 +886,7 @@ function ProblemTree({
   modules,
   problems,
   candidates,
+  isAssessRunning,
   invalidCandidateKeys,
   selectedProblemId,
   selectedCandidateKey,
@@ -748,13 +896,14 @@ function ProblemTree({
   modules: Module[];
   problems: Problem[];
   candidates: Candidate[];
+  isAssessRunning: boolean;
   invalidCandidateKeys: Set<string>;
   selectedProblemId: string | null;
   selectedCandidateKey: string | null;
   onSelectProblem: (problemId: string) => void;
   onSelectCandidate: (candidate: Candidate) => void;
 }) {
-  const groups = groupTreeItemsByModule(modules, problems, candidates);
+  const groups = groupTreeItemsByModule(modules, problems, candidates, isAssessRunning);
   console.log(`[tree] rendering ${candidates.length} candidates`);
   return (
     <ul className="problem-tree">
@@ -811,9 +960,9 @@ function ModuleGroup({
                 onSelectCandidate={onSelectCandidate}
               />
             ))
-          ) : (
+          ) : group.isAnalyzing ? (
             <li className="module-empty">분석 중...</li>
-          )}
+          ) : null}
         </ul>
       ) : null}
     </li>
@@ -933,13 +1082,19 @@ type ProblemModuleGroup = {
   problemCount: number;
   passedCount: number;
   items: TreeItem[];
+  isAnalyzing: boolean;
 };
 
 type TreeItem =
   | { kind: "problem"; key: string; parentId: string | null; problem: Problem }
   | { kind: "candidate"; key: string; parentId: string | null; candidate: Candidate };
 
-function groupTreeItemsByModule(modules: Module[], problems: Problem[], candidates: Candidate[]): ProblemModuleGroup[] {
+function groupTreeItemsByModule(
+  modules: Module[],
+  problems: Problem[],
+  candidates: Candidate[],
+  isAssessRunning: boolean,
+): ProblemModuleGroup[] {
   const generatedKeys = new Set(problems.map((problem) => `${problem.source_path}:${problem.target_symbol}`));
   const problemItems: TreeItem[] = problems.map((problem) => ({
     kind: "problem",
@@ -960,14 +1115,22 @@ function groupTreeItemsByModule(modules: Module[], problems: Problem[], candidat
   if (modules.length === 0) {
     return groupItemsBySourcePath(items);
   }
-  const groups = modules.map((module) => ({
-    id: module.id,
-    title: module.title,
-    problemCount: items.filter((item) => item.parentId === module.id).length,
-    passedCount: items.filter((item) => item.parentId === module.id && itemStatus(item) === "passed").length,
-    items: items.filter((item) => item.parentId === module.id),
-  }));
-  const orphanItems = items.filter((item) => !item.parentId || !modules.some((module) => module.id === item.parentId));
+  const uniqueModules = deduplicateModulesByTitle(modules);
+  const knownModuleIds = new Set(modules.map((module) => module.id));
+  const groups = uniqueModules
+    .map((module) => {
+      const groupedItems = items.filter((item) => item.parentId !== null && module.ids.has(item.parentId));
+      return {
+        id: module.id,
+        title: module.title,
+        problemCount: groupedItems.length,
+        passedCount: groupedItems.filter((item) => itemStatus(item) === "passed").length,
+        items: groupedItems,
+        isAnalyzing: isAssessRunning && groupedItems.length === 0,
+      };
+    })
+    .filter((group) => group.items.length > 0 || group.isAnalyzing);
+  const orphanItems = items.filter((item) => !item.parentId || !knownModuleIds.has(item.parentId));
   if (orphanItems.length > 0) {
     groups.push({
       id: "misc",
@@ -975,6 +1138,7 @@ function groupTreeItemsByModule(modules: Module[], problems: Problem[], candidat
       problemCount: orphanItems.length,
       passedCount: orphanItems.filter((item) => itemStatus(item) === "passed").length,
       items: orphanItems,
+      isAnalyzing: false,
     });
   }
   return groups;
@@ -992,7 +1156,30 @@ function groupItemsBySourcePath(items: TreeItem[]): ProblemModuleGroup[] {
     problemCount: grouped.length,
     passedCount: grouped.filter((item) => itemStatus(item) === "passed").length,
     items: grouped,
+    isAnalyzing: false,
   }));
+}
+
+function deduplicateModulesByTitle(modules: Module[]) {
+  const grouped = new Map<string, { id: string; title: string; ids: Set<string> }>();
+  for (const module of modules) {
+    const key = normalizeModuleTitle(module.title);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.ids.add(module.id);
+      continue;
+    }
+    grouped.set(key, {
+      id: module.id,
+      title: module.title,
+      ids: new Set([module.id]),
+    });
+  }
+  return [...grouped.values()];
+}
+
+function normalizeModuleTitle(title: string) {
+  return title.trim().toLowerCase();
 }
 
 function candidateKey(candidate: Candidate) {
@@ -1026,12 +1213,169 @@ function shortSymbol(symbol: string) {
   return parts.length > 2 ? parts.slice(-2).join(".") : symbol;
 }
 
-function projectNameFromPath(repoPath: string | undefined, fallback: string | undefined) {
-  if (!repoPath) {
-    return fallback ? `Project ${fallback.slice(0, 8)}` : "프로젝트";
+function stripPracticeSuffix(title: string) {
+  const suffix = " 구현하기";
+  return title.endsWith(suffix) ? title.slice(0, -suffix.length) : title;
+}
+
+function splitArchitectureFlow(flow: string) {
+  return flow
+    .replaceAll(String.fromCharCode(8594), "|")
+    .replaceAll("->", "|")
+    .replaceAll("=>", "|")
+    .split("|");
+}
+
+function buildArchitectureFlow(
+  summary: ProjectArchitectureResponse["project_summary"],
+  architecture: ProjectArchitectureResponse["architecture"],
+  title: string,
+): ArchitectureFlowItem[] {
+  const files = architecture?.files ?? [];
+  const summaryFlow = summary?.architecture_flow;
+  if (Array.isArray(summaryFlow) && summaryFlow.length > 0) {
+    return summaryFlow.map((entry) => parseFlowEntry(String(entry), files));
   }
-  const normalized = repoPath.replaceAll("\\", "/");
-  return `${normalized.split("/").filter(Boolean).at(-1) ?? "프로젝트"} 구현하기`;
+  if (typeof summaryFlow === "string" && summaryFlow.trim()) {
+    return splitArchitectureFlow(summaryFlow)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((entry) => parseFlowEntry(entry, files));
+  }
+
+  const explicitFlow = architecture?.architecture_flow;
+  if (explicitFlow) {
+    return splitArchitectureFlow(explicitFlow)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((entry) => parseFlowEntry(entry, files));
+  }
+
+  if (files.length === 0) {
+    return [];
+  }
+
+  const ordered = orderArchitectureFiles(files);
+  return [
+    { label: inferInputLabel(title), path: null, description: null },
+    ...ordered.map((file) => ({
+      label: file.classes?.[0] ?? file.functions?.[0] ?? titleFromPath(file.path),
+      path: file.path,
+      description: file.description ?? null,
+    })),
+    { label: "Output", path: null, description: null },
+  ];
+}
+
+function parseFlowEntry(entry: string, files: ArchitectureFile[]): ArchitectureFlowItem {
+  const [rawLabel, rawPath] = entry.split("|").map((part) => part.trim());
+  const matched = rawPath ? files.find((file) => normalizePath(file.path) === normalizePath(rawPath)) : findFileForFlowLabel(rawLabel, files);
+  return {
+    label: rawLabel,
+    path: rawPath || matched?.path || null,
+    description: matched?.description ?? null,
+  };
+}
+
+function orderArchitectureFiles(files: ArchitectureFile[]) {
+  const byPath = new Map(files.map((file) => [file.path, file]));
+  const visited = new Set<string>();
+  const ordered: ArchitectureFile[] = [];
+
+  function visit(file: ArchitectureFile) {
+    if (visited.has(file.path)) {
+      return;
+    }
+    visited.add(file.path);
+    for (const dependency of file.depends_on ?? []) {
+      const dependencyPath = resolveDependencyPath(dependency, files);
+      const dependencyFile = dependencyPath ? byPath.get(dependencyPath) : null;
+      if (dependencyFile) {
+        visit(dependencyFile);
+      }
+    }
+    ordered.push(file);
+  }
+
+  for (const file of files) {
+    visit(file);
+  }
+  return ordered;
+}
+
+function resolveDependencyPath(dependency: string, files: ArchitectureFile[]) {
+  const normalized = dependency.replaceAll("\\", "/").toLowerCase();
+  return files.find((file) => {
+    const path = file.path.toLowerCase();
+    return path === normalized || path.endsWith(`/${normalized}`) || titleFromPath(file.path).toLowerCase() === normalized;
+  })?.path;
+}
+
+function findFileForFlowLabel(label: string, files: ArchitectureFile[]) {
+  const normalizedLabel = normalizeFlowText(label);
+  return files.find((file) => {
+    const haystack = normalizeFlowText([
+      file.path,
+      file.description ?? "",
+      ...(file.classes ?? []),
+      ...(file.functions ?? []),
+    ].join(" "));
+    return haystack.includes(normalizedLabel) || normalizedLabel.includes(normalizeFlowText(titleFromPath(file.path)));
+  });
+}
+
+function isArchitectureNodeActive(item: ArchitectureFlowItem, activeTarget: { sourcePath: string | null; symbol: string | null }) {
+  if (!activeTarget.sourcePath && !activeTarget.symbol) {
+    return false;
+  }
+  if (item.path && activeTarget.sourcePath && normalizePath(item.path) === normalizePath(activeTarget.sourcePath)) {
+    return true;
+  }
+  if (activeTarget.symbol) {
+    const symbolPart = activeTarget.symbol.split(".")[0] ?? activeTarget.symbol;
+    return normalizeFlowText(item.label).includes(normalizeFlowText(symbolPart));
+  }
+  return false;
+}
+
+function normalizePath(path: string) {
+  return path.replaceAll("\\", "/").toLowerCase();
+}
+
+function normalizeFlowText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9?-?]+/g, "");
+}
+
+function inferInputLabel(title: string) {
+  return /image|vision|mixer|vit|cnn/i.test(title) ? "Input Image" : "Input";
+}
+
+function titleFromPath(path: string) {
+  const filename = path.split(/[\\/]/).at(-1) ?? path;
+  return filename
+    .replace(/\.[^.]+$/, "")
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function projectDisplayName(project: CurrentProject | null, fallback: string | undefined) {
+  if (project?.paper_source && project.paper_title) {
+    return truncateProjectName(project.paper_title);
+  }
+  if (project?.repo_path) {
+    const normalized = project.repo_path.replaceAll("\\", "/");
+    const name = normalized.split("/").filter(Boolean).at(-1);
+    if (name) {
+      return truncateProjectName(name);
+    }
+  }
+  return fallback ? `Project ${fallback.slice(0, 8)}` : "????";
+}
+
+function truncateProjectName(name: string) {
+  return name.length > 50 ? `${name.slice(0, 50)}...` : name;
 }
 
 function ResultPanel({

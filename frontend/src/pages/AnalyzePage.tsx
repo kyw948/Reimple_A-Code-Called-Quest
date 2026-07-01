@@ -71,6 +71,7 @@ type PaperCodegenStatusResponse = {
   current_file?: string | null;
   progress: number;
   generated_repo_path?: string | null;
+  completed_files?: string[];
   files: string[];
   errors: Array<{
     path: string;
@@ -165,6 +166,8 @@ export function AnalyzePage() {
   const [projectAnalysis, setProjectAnalysis] = useState<ProjectAnalyzeResponse | null>(null);
   const [paperPlan, setPaperPlan] = useState<PaperPlanResponse | null>(null);
   const [codegenStatus, setCodegenStatus] = useState<PaperCodegenStatusResponse | null>(null);
+  const [paperMetadata, setPaperMetadata] = useState<ProjectDetailResponse["paper_metadata"] | null>(null);
+  const [paperWorkflowStatus, setPaperWorkflowStatus] = useState("pending");
   const selectedExtensionSet = useMemo(() => new Set(selectedExtensions), [selectedExtensions]);
 
   useEffect(() => {
@@ -198,6 +201,8 @@ export function AnalyzePage() {
           generated_repo_path: projectResponse.data.generated_repo_path,
         };
         setCurrentProject(project);
+        setPaperMetadata(projectResponse.data.paper_metadata ?? null);
+        setPaperWorkflowStatus(projectResponse.data.analysis_status ?? "pending");
 
         if (!project.paper_source && fileTree.length === 0) {
           const analyzeResponse = await apiClient.post<AnalyzeResponse>("/repos/analyze", {
@@ -313,6 +318,7 @@ export function AnalyzePage() {
       window.setTimeout(() => setStatusText("상세 명세 작성 중... (3/3 구현 순서 결정)"), 1200);
       const response = await apiClient.post<PaperPlanResponse>(`/papers/${id}/plan`);
       setPaperPlan(response.data);
+      setPaperWorkflowStatus("planned");
       setStatusText("구조 설계가 완료되었습니다.");
     } catch (error) {
       setErrorMessage(getErrorMessage(error, "논문 구조 설계에 실패했습니다"));
@@ -332,6 +338,9 @@ export function AnalyzePage() {
       await apiClient.post<PaperCodegenStartResponse>(`/papers/${id}/generate-code`);
       const firstStatus = await apiClient.get<PaperCodegenStatusResponse>(`/papers/${id}/codegen-status`);
       setCodegenStatus(firstStatus.data);
+      if (firstStatus.data.status === "completed") {
+        setPaperWorkflowStatus("code_generated");
+      }
 
       const intervalId = window.setInterval(async () => {
         try {
@@ -339,6 +348,9 @@ export function AnalyzePage() {
           setCodegenStatus(statusResponse.data);
           if (["completed", "error"].includes(statusResponse.data.status)) {
             window.clearInterval(intervalId);
+            if (statusResponse.data.status === "completed") {
+              setPaperWorkflowStatus("code_generated");
+            }
             setStatusText(statusResponse.data.status === "completed" ? "코드 생성이 완료되었습니다." : "코드 생성에 실패했습니다.");
           }
         } catch (error) {
@@ -362,9 +374,14 @@ export function AnalyzePage() {
     setErrorMessage("");
     try {
       setStatusText("생성된 코드 파일 등록 중...");
+      const projectResponse = await apiClient.get<ProjectDetailResponse>(`/projects/${id}`);
+      console.log(`[연습시작] setup 호출, repo_path=${projectResponse.data.repo_path}, generated_repo_path=${projectResponse.data.generated_repo_path ?? "-"}`);
       await apiClient.post<ProjectSetupResponse>(`/projects/${id}/setup`);
+      console.log("[연습시작] setup 완료");
       setStatusText("생성된 코드 구조 분석 중...");
+      console.log("[연습시작] analyze 호출");
       await apiClient.post<ProjectAnalyzeResponse>(`/projects/${id}/analyze`, { force: true });
+      console.log("[연습시작] analyze 완료");
       navigate(`/projects/${id}/practice`);
     } catch (error) {
       setErrorMessage(getErrorMessage(error, "연습 시작에 실패했습니다"));
@@ -379,12 +396,13 @@ export function AnalyzePage() {
   }
 
   const isPaperProject = Boolean(currentProject?.paper_source);
+  const displayName = projectDisplayName(currentProject, id);
 
   return (
     <main className="analyze-page">
       <header className="project-header">
         <div>
-          <h1>프로젝트 분석</h1>
+          <h1>{displayName}</h1>
           <dl className="project-meta">
             <div>
               <dt>Repo</dt>
@@ -407,8 +425,10 @@ export function AnalyzePage() {
       {isPaperProject ? (
         <PaperAnalysisSummary
           project={currentProject}
+          paperMetadata={paperMetadata}
           plan={paperPlan}
           codegenStatus={codegenStatus}
+          workflowStatus={paperWorkflowStatus}
           statusText={statusText}
           onStartPlan={handleStartPaperPlan}
           onStartCodeGeneration={handleStartCodeGeneration}
@@ -458,10 +478,30 @@ export function AnalyzePage() {
   );
 }
 
+function projectDisplayName(project: CurrentProject | null, fallback: string | undefined) {
+  if (project?.paper_source && project.paper_title) {
+    return truncateProjectName(project.paper_title);
+  }
+  if (project?.repo_path) {
+    const normalized = project.repo_path.replaceAll("\\", "/");
+    const name = normalized.split("/").filter(Boolean).at(-1);
+    if (name) {
+      return truncateProjectName(name);
+    }
+  }
+  return fallback ? `Project ${fallback.slice(0, 8)}` : "????";
+}
+
+function truncateProjectName(name: string) {
+  return name.length > 50 ? `${name.slice(0, 50)}...` : name;
+}
+
 function PaperAnalysisSummary({
   project,
+  paperMetadata,
   plan,
   codegenStatus,
+  workflowStatus,
   statusText,
   onStartPlan,
   onStartCodeGeneration,
@@ -469,8 +509,10 @@ function PaperAnalysisSummary({
   isPreparingPractice,
 }: {
   project: CurrentProject | null;
+  paperMetadata: ProjectDetailResponse["paper_metadata"] | null;
   plan: PaperPlanResponse | null;
   codegenStatus: PaperCodegenStatusResponse | null;
+  workflowStatus: string;
   statusText: string;
   onStartPlan: () => void;
   onStartCodeGeneration: () => void;
@@ -480,6 +522,17 @@ function PaperAnalysisSummary({
   const components = plan?.overall_plan.components ?? [];
   const files = plan?.architecture.files ?? [];
   const implementationOrder = plan?.logic_design.implementation_order ?? [];
+  const completedFiles = codegenStatus?.completed_files ?? codegenStatus?.files ?? [];
+  const plannedFiles = files.map((file) => file.path);
+  const displayFiles = mergeFileLists(plannedFiles, completedFiles, codegenStatus?.current_file ?? null);
+  const codegenPercent = Math.round((codegenStatus?.progress ?? 0) * 100);
+  const normalizedWorkflowStatus = workflowStatus === "completed" ? "code_generated" : workflowStatus;
+  const isCodegenComplete = codegenStatus?.status === "completed" || normalizedWorkflowStatus === "code_generated";
+  const isCodegenRunning = codegenStatus?.status === "running";
+  const canPlan = normalizedWorkflowStatus === "pending" && !plan;
+  const canGenerateCode = Boolean(plan) && normalizedWorkflowStatus === "planned" && !isCodegenRunning;
+  const canStartPractice = normalizedWorkflowStatus === "code_generated";
+  const authors = paperMetadata?.authors ?? [];
 
   return (
     <section className="project-analysis-summary paper-analysis-summary">
@@ -497,93 +550,108 @@ function PaperAnalysisSummary({
         </div>
       </dl>
       <h3>{project?.paper_title || "제목 없음"}</h3>
+      {authors.length > 0 ? <p className="paper-authors">{authors.join(", ")}</p> : null}
       <p>{project?.paper_abstract || "Abstract를 찾지 못했습니다."}</p>
-      <div className="paper-next-step">
-        <strong>핵심 구조</strong>
-        <p>논문 본문을 기반으로 Paper2Code Planning을 실행해 참조 코드 구조를 설계합니다.</p>
-      </div>
 
-      <div className="setup-actions">
-        <button type="button" onClick={onStartPlan}>
-          구조 설계 시작
-        </button>
-        {statusText ? <p className="status-text">{statusText}</p> : null}
-      </div>
+      <div className="paper-stepper">
+        <div className={paperStepClass(canPlan, normalizedWorkflowStatus !== "pending")}>
+          <div className="paper-step-card-header">
+            <div className="paper-step-title">
+              <span className="paper-step-index">{normalizedWorkflowStatus !== "pending" ? "✓" : "1"}</span>
+              <h3>구조 설계</h3>
+            </div>
+            <StepStatusText isCompleted={normalizedWorkflowStatus !== "pending"} isActive={canPlan} />
+          </div>
+          {canPlan ? (
+            <button className="paper-step-action" type="button" onClick={onStartPlan} disabled={isCodegenRunning}>
+              구조 설계 시작
+            </button>
+          ) : plan ? (
+            <details className="paper-step-details">
+              <summary>설계 결과 보기</summary>
+              <div className="paper-plan-results">
+                <section className="analysis-modules">
+                  <h3>핵심 컴포넌트</h3>
+                  <p>{plan.overall_plan.summary || "요약 없음"}</p>
+                  <ul>
+                    {components.map((component) => (
+                      <li key={component.name}>
+                        <strong>{component.name}</strong>
+                        <span>{component.description || "-"}</span>
+                        <small>
+                          {component.category || "other"} ? {component.importance || "supporting"}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
 
-      {plan ? (
-        <div className="paper-plan-results">
-          <section className="analysis-modules">
-            <h3>핵심 컴포넌트</h3>
-            <p>{plan.overall_plan.summary || "요약 없음"}</p>
-            <ul>
-              {components.map((component) => (
-                <li key={component.name}>
-                  <strong>{component.name}</strong>
-                  <span>{component.description || "-"}</span>
-                  <small>
-                    {component.category || "other"} · {component.importance || "supporting"}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          </section>
+                <section className="analysis-modules">
+                  <h3>파일 구조</h3>
+                  <ul>
+                    {files.map((file) => (
+                      <li key={file.path}>
+                        <strong>{file.path}</strong>
+                        <span>{file.description || "-"}</span>
+                        <small>{[...(file.classes ?? []), ...(file.functions ?? [])].join(", ") || "구성 요소 없음"}</small>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
 
-          <section className="analysis-modules">
-            <h3>파일 구조</h3>
-            <ul>
-              {files.map((file) => (
-                <li key={file.path}>
-                  <strong>{file.path}</strong>
-                  <span>{file.description || "-"}</span>
-                  <small>{[...(file.classes ?? []), ...(file.functions ?? [])].join(", ") || "구성 요소 없음"}</small>
-                </li>
-              ))}
-            </ul>
-          </section>
+                <section className="analysis-modules">
+                  <h3>구현 순서</h3>
+                  <ol>
+                    {implementationOrder.map((path) => (
+                      <li key={path}>
+                        <span>{path}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              </div>
+            </details>
+          ) : null}
+        </div>
 
-          <section className="analysis-modules">
-            <h3>구현 순서</h3>
-            <ol>
-              {implementationOrder.map((path) => (
-                <li key={path}>
-                  <span>{path}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          <div className="paper-next-step">
-            <strong>코드 생성 시작</strong>
-            <p>다음 단계에서 Planning 결과를 기반으로 임시 repository를 생성합니다.</p>
-            <button type="button" onClick={onStartCodeGeneration} disabled={codegenStatus?.status === "running"}>
+        <div className={paperStepClass(canGenerateCode || isCodegenRunning, normalizedWorkflowStatus === "code_generated")}>
+          <div className="paper-step-card-header">
+            <div className="paper-step-title">
+              <span className="paper-step-index">{normalizedWorkflowStatus === "code_generated" ? "✓" : "2"}</span>
+              <h3>코드 생성</h3>
+            </div>
+            <StepStatusText
+              isCompleted={normalizedWorkflowStatus === "code_generated"}
+              isActive={canGenerateCode || isCodegenRunning}
+              pendingText="이전 단계 완료 후 가능"
+            />
+          </div>
+          {canGenerateCode ? (
+            <button className="paper-step-action" type="button" onClick={onStartCodeGeneration}>
               코드 생성 시작
             </button>
-          </div>
-
-          {codegenStatus ? (
+          ) : normalizedWorkflowStatus === "pending" ? null : codegenStatus ? (
             <section className="analysis-modules codegen-status">
-              <h3>코드 생성 진행</h3>
               <p>
-                {codegenStatus.status === "completed"
-                  ? `코드 생성 완료! ${codegenStatus.files.length}개 파일이 생성되었습니다.`
+                {isCodegenComplete
+                  ? `코드 생성 완료! ${completedFiles.length}개 파일이 생성되었습니다.`
                   : codegenStatus.status === "error"
                     ? "코드 생성 중 오류가 발생했습니다."
-                    : `코드 생성 중... (${codegenStatus.generated_files}/${codegenStatus.total_files} 파일)`}
+                    : `코드 생성 중... ${codegenStatus.generated_files}/${codegenStatus.total_files} 파일 (${codegenPercent}%)`}
               </p>
               {codegenStatus.current_file ? <small>현재: {codegenStatus.current_file}</small> : null}
               <div className="progress-bar" aria-label="코드 생성 진행률">
-                <span style={{ width: `${Math.round((codegenStatus.progress || 0) * 100)}%` }} />
+                <span style={{ width: `${codegenPercent}%` }} />
               </div>
-              {codegenStatus.generated_repo_path ? <small>생성 경로: {codegenStatus.generated_repo_path}</small> : null}
-              {codegenStatus.files.length > 0 ? (
-                <ul>
-                  {codegenStatus.files.map((path) => (
-                    <li key={path}>
-                      <span>{path}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              <ul className="codegen-file-list">
+                {displayFiles.map((path) => (
+                  <li key={path} className={fileCodegenClass(path, completedFiles, codegenStatus.current_file ?? null)}>
+                    <span>{fileCodegenIcon(path, completedFiles, codegenStatus.current_file ?? null)}</span>
+                    <span>{path}</span>
+                    {path === codegenStatus.current_file ? <small>생성 중...</small> : null}
+                  </li>
+                ))}
+              </ul>
               {codegenStatus.errors.length > 0 ? (
                 <details>
                   <summary>오류 파일 보기</summary>
@@ -597,19 +665,92 @@ function PaperAnalysisSummary({
                   </ul>
                 </details>
               ) : null}
-              <button
-                type="button"
-                onClick={onStartGeneratedPractice}
-                disabled={codegenStatus.status !== "completed" || isPreparingPractice}
-              >
-                연습 시작
-              </button>
             </section>
+          ) : (
+            <p className="paper-step-muted">이전 단계 완료 후 가능</p>
+          )}
+        </div>
+
+        <div className={paperStepClass(canStartPractice, false)}>
+          <div className="paper-step-card-header">
+            <div className="paper-step-title">
+              <span className="paper-step-index">3</span>
+              <h3>연습 시작</h3>
+            </div>
+            <StepStatusText isCompleted={false} isActive={canStartPractice} pendingText="코드 생성 완료 후 가능" />
+          </div>
+          {canStartPractice ? (
+            <button className="paper-step-action practice" type="button" onClick={onStartGeneratedPractice} disabled={isPreparingPractice}>
+              연습 시작
+            </button>
           ) : null}
         </div>
-      ) : null}
+      </div>
+      {statusText ? <p className="status-text">{statusText}</p> : null}
     </section>
   );
+}
+
+function paperStepClass(isActive: boolean, isCompleted: boolean) {
+  if (isCompleted) {
+    return "paper-step-card completed";
+  }
+  if (isActive) {
+    return "paper-step-card active";
+  }
+  return "paper-step-card disabled";
+}
+
+function StepStatusText({
+  isCompleted,
+  isActive,
+  pendingText = "이전 단계 완료 후 가능",
+}: {
+  isCompleted: boolean;
+  isActive: boolean;
+  pendingText?: string;
+}) {
+  if (isCompleted) {
+    return <span className="paper-step-state completed">완료</span>;
+  }
+  if (isActive) {
+    return <span className="paper-step-state active">진행 가능</span>;
+  }
+  return <span className="paper-step-state disabled">{pendingText}</span>;
+}
+
+function mergeFileLists(plannedFiles: string[], completedFiles: string[], currentFile: string | null) {
+  const ordered = new Set<string>();
+  for (const path of plannedFiles) {
+    ordered.add(path);
+  }
+  for (const path of completedFiles) {
+    ordered.add(path);
+  }
+  if (currentFile) {
+    ordered.add(currentFile);
+  }
+  return [...ordered];
+}
+
+function fileCodegenClass(path: string, completedFiles: string[], currentFile: string | null) {
+  if (completedFiles.includes(path)) {
+    return "completed";
+  }
+  if (path === currentFile) {
+    return "current";
+  }
+  return "pending";
+}
+
+function fileCodegenIcon(path: string, completedFiles: string[], currentFile: string | null) {
+  if (completedFiles.includes(path)) {
+    return "✓";
+  }
+  if (path === currentFile) {
+    return "→";
+  }
+  return "";
 }
 
 function ProjectAnalysisSummary({

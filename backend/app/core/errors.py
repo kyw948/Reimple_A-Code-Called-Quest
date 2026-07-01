@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 ERROR_STATUS_CODES = {
     "CLONE_FAILED": 422,
     "INVALID_HINT_LEVEL": 400,
+    "FIGURE_NOT_FOUND": 404,
     "INVALID_ARXIV_URL": 400,
     "INVALID_PROJECT_MODE": 400,
     "INVALID_REPO_PATH": 400,

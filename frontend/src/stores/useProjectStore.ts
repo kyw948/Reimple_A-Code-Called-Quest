@@ -141,13 +141,13 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setFileTree: (fileTree) => set({ fileTree }),
   setExtensionStats: (extensionStats) => set({ extensionStats }),
   setProblems: (problems) => set({ problems }),
-  setCandidates: (candidates) => set({ candidates }),
+  setCandidates: (candidates) => set({ candidates: deduplicateCandidates(candidates) }),
   setModules: (modules) => set({ modules }),
   setOverallProgress: (overallProgress) => set({ overallProgress }),
   preparePractice: async (projectId) => {
     const response = await apiClient.post<PracticePrepareApiResponse>(`/projects/${projectId}/prepare`);
     const modules = (response.data.modules ?? []).map(normalizeModule);
-    const candidates = (response.data.candidates ?? []).map(normalizeCandidate);
+    const candidates = deduplicateCandidates((response.data.candidates ?? []).map(normalizeCandidate));
     set({ modules, candidates });
     return candidates;
   },
@@ -280,6 +280,40 @@ export function normalizeCandidate(candidate: CandidateApiItem): Candidate {
     problemId: candidate.problem_id ?? null,
     parentId: candidate.parent_id ?? null,
   };
+}
+
+function deduplicateCandidates(candidates: Candidate[]) {
+  const seen = new Map<string, Candidate>();
+  for (const candidate of candidates) {
+    if (isInitSymbol(candidate.symbol)) {
+      continue;
+    }
+    const key = normalizedSymbolKey(candidate.symbol);
+    const existing = seen.get(key);
+    if (!existing || candidatePriority(candidate) < candidatePriority(existing)) {
+      seen.set(key, candidate);
+    }
+  }
+  return [...seen.values()];
+}
+
+function normalizedSymbolKey(symbol: string) {
+  return symbol
+    .split(".")
+    .map((part) => part.replace(/^_+|_+$/g, ""))
+    .join(".")
+    .toLowerCase();
+}
+
+function isInitSymbol(symbol: string) {
+  const normalized = normalizedSymbolKey(symbol);
+  return normalized === "init" || normalized.endsWith(".init");
+}
+
+function candidatePriority(candidate: Candidate) {
+  const normalized = candidate.sourcePath.replaceAll("\\", "/").toLowerCase();
+  const monolithicPenalty = /(?:^|\/)(?:model|models|network|networks)\.py$/.test(normalized) ? 10000 : 0;
+  return monolithicPenalty + normalized.length;
 }
 
 function parseDependencyIds(value: string | string[] | null | undefined) {

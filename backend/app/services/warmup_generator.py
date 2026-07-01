@@ -1,4 +1,5 @@
 import json
+import random
 from typing import Any
 
 from pydantic import BaseModel
@@ -88,12 +89,13 @@ def _normalize_questions(parsed: Any) -> list[WarmupQuestion]:
         explanation = str(item.get("explanation") or "").strip()
         if not question or not explanation:
             continue
+        shuffled_options, shuffled_answer = _shuffle_answer([str(option) for option in options], answer)
         questions.append(
             WarmupQuestion(
                 id=len(questions),
                 question=question,
-                options=[str(option) for option in options],
-                answer=answer,
+                options=shuffled_options,
+                answer=shuffled_answer,
                 explanation=explanation,
             )
         )
@@ -104,7 +106,7 @@ def _fallback_questions(summary: dict[str, Any]) -> list[WarmupQuestion]:
     framework = str(summary.get("framework") or "other")
     domain = str(summary.get("domain") or "other")
     contribution = str(summary.get("main_contribution") or "프로젝트의 핵심 아이디어")
-    return [
+    questions = [
         WarmupQuestion(
             id=0,
             question="이 프로젝트를 풀기 전에 가장 먼저 파악하면 좋은 정보는 무엇인가요?",
@@ -127,6 +129,25 @@ def _fallback_questions(summary: dict[str, Any]) -> list[WarmupQuestion]:
             explanation=f"이 프로젝트는 {domain} 영역이며, 함수의 import와 호출 관계를 보면 {contribution}와 연결된 역할을 이해하기 쉽습니다.",
         ),
     ]
+    return [_shuffle_warmup_question(question) for question in questions]
+
+
+def _shuffle_answer(options: list[str], answer: int) -> tuple[list[str], int]:
+    correct_answer = options[answer]
+    shuffled = options[:]
+    random.shuffle(shuffled)
+    return shuffled, shuffled.index(correct_answer)
+
+
+def _shuffle_warmup_question(question: WarmupQuestion) -> WarmupQuestion:
+    options, answer = _shuffle_answer(question.options, question.answer)
+    return WarmupQuestion(
+        id=question.id,
+        question=question.question,
+        options=options,
+        answer=answer,
+        explanation=question.explanation,
+    )
 
 
 def _project_summary(project_id: str) -> dict[str, Any]:

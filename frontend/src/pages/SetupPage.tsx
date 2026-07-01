@@ -49,6 +49,8 @@ type PaperParseResponse = {
   content: string;
   source: "arxiv" | "pdf";
   url?: string | null;
+  figure_count?: number;
+  figure_token?: string | null;
 };
 
 type ApiErrorResponse = {
@@ -167,6 +169,8 @@ export function SetupPage() {
         paper_metadata: {
           authors: paper.authors,
           year: paper.year,
+          figure_count: paper.figure_count ?? 0,
+          figure_token: paper.figure_token ?? null,
         },
         practice_root_path: practiceRootPath.trim(),
       });

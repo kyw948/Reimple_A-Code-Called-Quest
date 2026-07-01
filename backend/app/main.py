@@ -7,6 +7,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.core.errors import AppError, app_error_handler, http_error_handler
 from app.db.database import create_tables
@@ -44,7 +45,7 @@ from app.services.file_assessor import (
 )
 from app.services.hint_generator import ProblemHintRequest, ProblemHintResponse, generate_hint
 from app.services.project_analyzer import ProjectAnalyzeRequest, ProjectAnalyzeResponse, analyze_project
-from app.services.paper_parser import PaperParseResponse, parse_arxiv, parse_multipart_pdf, parse_pdf_upload
+from app.services.paper_parser import PaperParseResponse, get_project_figure_path, parse_arxiv, parse_multipart_pdf, parse_pdf_upload, save_relevant_figures_for_project
 from app.services.paper_planner import PaperPlanRequest, PaperPlanResponse, plan_paper_project
 from app.services.paper_codegen import (
     PaperCodegenStartResponse,
@@ -122,6 +123,15 @@ def create_app() -> FastAPI:
     @app.get("/api/papers/{project_id}/codegen-status", response_model=PaperCodegenStatusResponse)
     def get_paper_codegen_status(project_id: str) -> PaperCodegenStatusResponse:
         return get_codegen_status(project_id)
+
+    @app.get("/api/papers/{project_id}/figures/{index}")
+    def get_paper_figure(project_id: str, index: int) -> FileResponse:
+        project = get_project_detail(project_id)
+        if project.project_summary:
+            save_relevant_figures_for_project(project_id, project.project_summary)
+        path = get_project_figure_path(project_id, index)
+        media_type = "image/jpeg" if path.suffix.lower() in {".jpg", ".jpeg"} else f"image/{path.suffix.lower().lstrip('.')}"
+        return FileResponse(path, media_type=media_type)
 
     @app.post("/api/projects", response_model=ProjectCreateResponse)
     def post_project(payload: ProjectCreateRequest) -> ProjectCreateResponse:

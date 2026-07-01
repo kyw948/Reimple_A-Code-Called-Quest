@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+pytest
+pytest-json-report
+python-multipart
+google-genai
+python-dotenv
+pymupdf
+requests

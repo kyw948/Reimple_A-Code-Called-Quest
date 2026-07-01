@@ -656,7 +656,38 @@ def _assessed_candidates(project_id: str) -> list[dict[str, Any]]:
     from app.services.problem_tree import prepare_practice
 
     prepared = prepare_practice(project_id)
-    return [candidate.model_dump() for candidate in prepared.candidates]
+    return _deduplicate_candidates([candidate.model_dump() for candidate in prepared.candidates])
+
+
+def _deduplicate_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        symbol = str(candidate.get("symbol") or "").strip()
+        if not symbol or _is_init_symbol(symbol):
+            continue
+        key = _normalized_symbol_key(symbol)
+        current = seen.get(key)
+        if current is None or _candidate_priority(candidate) < _candidate_priority(current):
+            seen[key] = candidate
+    return list(seen.values())
+
+
+def _normalized_symbol_key(symbol: str) -> str:
+    parts = [part.strip("_") for part in symbol.split(".")]
+    return ".".join(parts).lower()
+
+
+def _is_init_symbol(symbol: str) -> bool:
+    normalized = _normalized_symbol_key(symbol)
+    return normalized == "init" or normalized.endswith(".init")
+
+
+def _candidate_priority(candidate: dict[str, Any]) -> tuple[int, int, int]:
+    source_path = str(candidate.get("source_path") or "")
+    normalized = source_path.replace("\\", "/").lower()
+    path_depth = normalized.count("/")
+    monolithic_penalty = 1 if normalized.endswith(("model.py", "models.py", "network.py", "networks.py")) else 0
+    return (monolithic_penalty, path_depth, len(source_path))
 
 
 def _project_context(project, source_paths: list[str]) -> dict[str, Any] | None:

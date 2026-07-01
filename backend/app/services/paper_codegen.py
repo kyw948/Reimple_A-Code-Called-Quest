@@ -29,6 +29,7 @@ class PaperCodegenStatusResponse(BaseModel):
     current_file: str | None = None
     progress: float = 0.0
     generated_repo_path: str | None = None
+    completed_files: list[str] = Field(default_factory=list)
     files: list[str] = Field(default_factory=list)
     errors: list[dict[str, str]] = Field(default_factory=list)
 
@@ -46,16 +47,18 @@ def start_code_generation(project_id: str) -> PaperCodegenStartResponse:
 
     existing_path = project["generated_repo_path"]
     if project["analysis_status"] == "code_generated" and existing_path and Path(existing_path).exists():
+        completed_files = _list_generated_files(existing_path)
         _set_job(
             project_id,
             {
                 "status": "completed",
-                "total_files": 0,
-                "generated_files": 0,
+                "total_files": len(_planned_file_paths(project)) or len(completed_files),
+                "generated_files": len(completed_files),
                 "current_file": None,
                 "progress": 1.0,
                 "generated_repo_path": existing_path,
-                "files": _list_generated_files(existing_path),
+                "completed_files": completed_files,
+                "files": completed_files,
                 "errors": [],
             },
         )
@@ -78,6 +81,7 @@ def start_code_generation(project_id: str) -> PaperCodegenStartResponse:
             "current_file": None,
             "progress": 0.0,
             "generated_repo_path": None,
+            "completed_files": [],
             "files": [],
             "errors": [],
         },
@@ -94,14 +98,16 @@ def get_codegen_status(project_id: str) -> PaperCodegenStatusResponse:
         job = dict(_jobs.get(project_id) or {})
 
     if not job and project["analysis_status"] == "code_generated" and project["generated_repo_path"]:
+        completed_files = _list_generated_files(project["generated_repo_path"])
         job = {
             "status": "completed",
-            "total_files": 0,
-            "generated_files": 0,
+            "total_files": len(_planned_file_paths(project)) or len(completed_files),
+            "generated_files": len(completed_files),
             "current_file": None,
             "progress": 1.0,
             "generated_repo_path": project["generated_repo_path"],
-            "files": _list_generated_files(project["generated_repo_path"]),
+            "completed_files": completed_files,
+            "files": completed_files,
             "errors": [],
         }
 
@@ -113,6 +119,7 @@ def get_codegen_status(project_id: str) -> PaperCodegenStatusResponse:
             "current_file": None,
             "progress": 0.0,
             "generated_repo_path": project["generated_repo_path"],
+            "completed_files": [],
             "files": [],
             "errors": [],
         }
@@ -144,6 +151,7 @@ def _run_codegen_background(project_id: str) -> None:
                 project_id,
                 generated_files=len(generated_files),
                 progress=(len(generated_files) + len(errors)) / max(len(files), 1),
+                completed_files=sorted(generated_files),
                 files=sorted(generated_files),
                 errors=errors,
             )
@@ -166,6 +174,7 @@ def _run_codegen_background(project_id: str) -> None:
             current_file=None,
             progress=1.0,
             generated_repo_path=repo_path,
+            completed_files=sorted(generated_files),
             files=sorted(generated_files),
             errors=errors,
         )
@@ -364,3 +373,9 @@ def _list_generated_files(repo_path: str) -> list[str]:
     if not root.exists():
         return []
     return sorted(path.relative_to(root).as_posix() for path in root.rglob("*.py"))
+
+
+def _planned_file_paths(project) -> list[str]:
+    architecture = _loads(project["architecture"])
+    logic_design = _loads(project["dependency_graph"])
+    return [str(item.get("path")) for item in _ordered_files(architecture, logic_design) if item.get("path")]
