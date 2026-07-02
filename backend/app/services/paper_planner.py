@@ -50,6 +50,9 @@ def plan_paper_project(project_id: str, payload: PaperPlanRequest | None = None)
         and cached_architecture
         and cached_logic
     ):
+        if not cached_overall.get("paper_summary") and cached_overall.get("summary"):
+            cached_overall["paper_summary"] = cached_overall["summary"]
+            _update_project(project_id, project_summary=json.dumps(cached_overall, ensure_ascii=False))
         _render_and_store_figures(project_id, project, cached_overall)
         return PaperPlanResponse(
             status="planned",
@@ -98,6 +101,7 @@ def _run_overall_plan(project) -> dict[str, Any]:
 JSON으로 응답:
 {{
   "summary": "논문 핵심 내용 3~5문장",
+  "paper_summary": "이 논문의 핵심 내용을 비전문가도 이해할 수 있게 3~4문장으로 요약. 어떤 문제를 풀려고 하는지, 어떤 방법을 제안하는지, 기존 방법과 뭐가 다른지.",
   "domain": "computer_vision | nlp | speech | reinforcement_learning | generative | other",
   "framework": "pytorch",
   "components": [
@@ -111,7 +115,7 @@ JSON으로 응답:
   "key_algorithms": ["핵심 알고리즘"],
   "required_libraries": ["torch", "numpy"]
 }}"""
-    return _call_planning_step(
+    result = _call_planning_step(
         prompt,
         PAPER_OVERALL_PLAN_SYSTEM,
         {
@@ -124,6 +128,8 @@ JSON으로 응답:
         },
         "Overall Plan",
     )
+    result.setdefault("paper_summary", result.get("summary", ""))
+    return result
 
 
 def _run_architecture_design(project, overall_plan: dict[str, Any]) -> dict[str, Any]:
@@ -142,7 +148,7 @@ def _run_architecture_design(project, overall_plan: dict[str, Any]) -> dict[str,
 
 JSON으로 응답:
 {{
-  "architecture_flow": "Input Image ? Patch Embedding ? Encoder Block ? N ? Classification Head ? Output",
+  "architecture_flow": "Input Image -> Patch Embedding -> Encoder Block x N -> Classification Head -> Output",
   "files": [
     {{
       "path": "models/attention.py",

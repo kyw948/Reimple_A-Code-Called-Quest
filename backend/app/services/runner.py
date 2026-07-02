@@ -191,8 +191,12 @@ def _write_submission_code(temp_dir: Path, source_path: str, code: str) -> None:
 
 
 def _save_passed_submission(project, problem, payload: ProblemSubmitRequest) -> str | None:
-    practice_root = Path(project["practice_root_path"])
+    practice_root = Path(project["practice_root_path"]).expanduser()
     destination = practice_root / problem["source_path"]
+    print(
+        f"[submit] project_id={project['id']} practice_root_path={practice_root} "
+        f"saved_path={destination} source_path={problem['source_path']}"
+    )
     if destination.exists() and not payload.overwrite:
         return None
 

@@ -571,6 +571,13 @@ button {
   color: #6b7280;
 }
 
+.codegen-file-list li span:nth-child(2) {
+  min-width: 0;
+  text-align: left;
+  justify-self: start;
+  overflow-wrap: anywhere;
+}
+
 .setup-tabs button {
   min-height: 38px;
   border-radius: 5px;
@@ -736,6 +743,35 @@ button {
   font-size: 14px;
 }
 
+.file-tree.collapsed {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.file-tree.expanded {
+  max-height: none;
+  overflow: visible;
+}
+
+.file-tree-toggle {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  margin-top: 12px;
+  border-top: 1px solid #e5e8ef;
+  border-radius: 0 0 6px 6px;
+  color: #16477f;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.file-tree-toggle:hover {
+  background: #eef4ff;
+}
+
 .tree-directory {
   margin: 3px 0;
 }
@@ -816,6 +852,11 @@ button {
   cursor: pointer;
 }
 
+.extension-selector li.non-code-extension label {
+  grid-template-columns: 18px minmax(56px, 0.45fr) minmax(0, 1fr) auto;
+  cursor: not-allowed;
+}
+
 .extension-selector input {
   width: 16px;
   height: 16px;
@@ -825,6 +866,22 @@ button {
 .extension-selector span {
   color: #374151;
   font-weight: 700;
+}
+
+.extension-selector em {
+  color: #8a93a3;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.extension-selector li.non-code-extension span,
+.extension-selector li.non-code-extension strong {
+  color: #9ca3af;
+}
+
+.extension-selector input:disabled {
+  cursor: not-allowed;
 }
 
 .extension-selector strong {
@@ -1046,6 +1103,100 @@ button {
 .failed-files strong {
   color: #9a5b00;
   font-size: 13px;
+}
+
+.analysis-modules ul,
+.analysis-modules ol {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-modules ul li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 6px 0;
+}
+
+.analysis-modules ul li::before {
+  content: "\2022";
+  flex: 0 0 auto;
+  color: #6b7280;
+  font-weight: 900;
+}
+
+.analysis-modules ul li strong {
+  min-width: 80px;
+  color: #111827;
+  font-weight: 800;
+}
+
+.analysis-modules ul li span {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #374151;
+  overflow-wrap: anywhere;
+}
+
+.analysis-modules ul li small {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.analysis-modules ol {
+  counter-reset: implementation-order;
+}
+
+.implementation-order-item {
+  counter-increment: implementation-order;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.implementation-order-item::before {
+  content: counter(implementation-order) ".";
+  color: #6b7280;
+  font-weight: 800;
+}
+
+.implementation-order-main {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.implementation-order-main strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: #111827;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.implementation-order-main span {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #6b7280;
+  overflow-wrap: anywhere;
+}
+
+.implementation-order-item small {
+  color: #6b7280;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .practice-page {

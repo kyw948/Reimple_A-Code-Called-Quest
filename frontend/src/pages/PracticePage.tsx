@@ -96,6 +96,7 @@ type ProjectArchitectureResponse = {
   project_summary?: {
     project_summary?: string;
     summary?: string;
+    paper_summary?: string;
     architecture_flow?: string[] | string;
     architecture_figure?: number | string | null;
     components?: Array<{
@@ -273,7 +274,7 @@ export function PracticePage() {
             buildArchitectureFlow(projectDetail.data.project_summary ?? {}, projectDetail.data.architecture ?? {}, projectDetail.data.paper_title ?? projectTitle),
           );
           setPaperFigureCount(projectDetail.data.paper_metadata?.figure_count ?? 0);
-          setPaperSummaryText(projectDetail.data.paper_abstract ?? "");
+          setPaperSummaryText(projectDetail.data.project_summary?.paper_summary ?? projectDetail.data.project_summary?.summary ?? projectDetail.data.project_summary?.project_summary ?? projectDetail.data.paper_abstract ?? "");
         }
         const loadedCandidates = await preparePractice(id);
         const loadedProblems = await refreshProblems(id);
@@ -1371,7 +1372,7 @@ function projectDisplayName(project: CurrentProject | null, fallback: string | u
       return truncateProjectName(name);
     }
   }
-  return fallback ? `Project ${fallback.slice(0, 8)}` : "????";
+  return fallback ? `Project ${fallback.slice(0, 8)}` : "프로젝트";
 }
 
 function truncateProjectName(name: string) {

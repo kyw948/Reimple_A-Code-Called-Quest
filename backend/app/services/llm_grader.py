@@ -223,11 +223,32 @@ def _build_feedback_prompt(test_results: list[LlmTestCaseResult], passed_count: 
 
 
 def _extract_function_source(source: str, target_symbol: str) -> str | None:
-    tree = ast.parse(source)
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+
+    node = _find_function_node(tree, target_symbol)
+    if node is None:
+        return None
+
+    lines = source.splitlines(keepends=True)
+    return "".join(lines[node.lineno - 1 : node.end_lineno])
+
+
+def _find_function_node(tree: ast.AST, target_symbol: str) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    if "." in target_symbol:
+        class_name, method_name = target_symbol.split(".", 1)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                for child in node.body:
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name == method_name:
+                        return child
+        return None
+
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == target_symbol:
-            lines = source.splitlines(keepends=True)
-            return "".join(lines[node.lineno - 1 : node.end_lineno])
+            return node
     return None
 
 
@@ -276,6 +297,27 @@ def _legacy_grade_from_response(raw_response: str | dict) -> LlmGradeResult:
         score=_normalize_score(parsed.get("score")),
         test_cases=None,
     )
+
+
+def _grade_with_full_code_fallback(original_code: str, submitted_code: str, target_symbol: str) -> LlmGradeResult:
+    try:
+        parsed_response = llm_client.call_gemini_with_validation(
+            _build_full_code_fallback_prompt(original_code, submitted_code, target_symbol),
+            SYSTEM_INSTRUCTION,
+            {"passed": bool},
+            max_retries=1,
+        )
+        if parsed_response is None or not isinstance(parsed_response, dict):
+            if _last_validation_error_code() == "LLM_API_KEY_MISSING" or not llm_client.get_gemini_api_key():
+                return LlmGradeResult(passed=False, feedback="LLM 채점을 위해 GEMINI_API_KEY가 필요합니다")
+            return LlmGradeResult(passed=False, feedback=f"제출 코드에서 {target_symbol} 함수를 찾을 수 없습니다")
+        return _legacy_grade_from_response(parsed_response)
+    except AppError as exc:
+        if exc.detail.get("error_code") == "LLM_API_KEY_MISSING":
+            return LlmGradeResult(passed=False, feedback="LLM 채점을 위해 GEMINI_API_KEY가 필요합니다")
+        raise
+    except (json.JSONDecodeError, ValueError):
+        return LlmGradeResult(passed=False, feedback=f"제출 코드에서 {target_symbol} 함수를 찾을 수 없습니다")
 
 
 def _grade_with_legacy_comparison(original_code: str, submitted_function: str) -> LlmGradeResult:
@@ -401,6 +443,32 @@ def _normalize_score(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _build_full_code_fallback_prompt(original_code: str, submitted_code: str, target_symbol: str) -> str:
+    return f"""아래 원본 함수와 제출 코드 전체를 비교하여 채점해주세요.
+
+대상 함수/메서드: {target_symbol}
+
+## 원본 함수
+```
+{original_code}
+```
+
+## 제출 코드 전체
+```
+{submitted_code}
+```
+
+제출 코드 안에서 대상 함수/메서드가 올바르게 구현되었는지 판단하세요.
+클래스 메서드인 경우 class 내부의 해당 메서드를 기준으로 평가하세요.
+
+아래 JSON 형식으로만 응답하세요:
+{{
+  "passed": true 또는 false,
+  "feedback": "채점 결과에 대한 한국어 피드백",
+  "score": 0~100
+}}"""
 
 
 def _build_legacy_prompt(original_code: str, submitted_code: str) -> str:

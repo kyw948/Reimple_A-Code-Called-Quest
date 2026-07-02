@@ -86,16 +86,17 @@ class ProjectSetupResponse(BaseModel):
 def create_project(payload: ProjectCreateRequest) -> ProjectCreateResponse:
     is_paper_project = bool(payload.paper_source)
     repo_path = None if is_paper_project else _resolve_existing_repo(payload.repo_path or "")
+    project_id = str(uuid.uuid4())
     raw_practice_root_path = (payload.practice_root_path or "").strip()
     if raw_practice_root_path:
         practice_root_path = Path(raw_practice_root_path).expanduser().resolve()
     elif is_paper_project:
-        practice_root_path = Path(get_default_paper_practice_root(payload.paper_title or "paper")).resolve()
+        practice_root_path = Path(get_default_paper_practice_root(payload.paper_title or project_id[:8])).resolve()
     else:
         practice_root_path = Path(get_default_practice_root(str(repo_path))).resolve()
     practice_root_path.mkdir(parents=True, exist_ok=True)
+    print(f"[projects] practice_root_path={practice_root_path} repo_path={repo_path or ''} project_id={project_id}")
 
-    project_id = str(uuid.uuid4())
     now = _utc_now()
 
     paper_metadata = dict(payload.paper_metadata or {})

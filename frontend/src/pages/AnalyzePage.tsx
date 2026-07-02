@@ -139,6 +139,7 @@ const DEFAULT_CODE_EXTENSIONS = new Set([
   ".go",
   ".rs",
   ".rb",
+  ".php",
   ".swift",
   ".kt",
   ".cs",
@@ -168,6 +169,7 @@ export function AnalyzePage() {
   const [codegenStatus, setCodegenStatus] = useState<PaperCodegenStatusResponse | null>(null);
   const [paperMetadata, setPaperMetadata] = useState<ProjectDetailResponse["paper_metadata"] | null>(null);
   const [paperWorkflowStatus, setPaperWorkflowStatus] = useState("pending");
+  const [isFileTreeExpanded, setIsFileTreeExpanded] = useState(false);
   const selectedExtensionSet = useMemo(() => new Set(selectedExtensions), [selectedExtensions]);
 
   useEffect(() => {
@@ -440,13 +442,20 @@ export function AnalyzePage() {
       <section className="analyze-layout">
         <section className="analyze-panel">
           <h2>파일 트리</h2>
-          <div className="file-tree" aria-label="파일 트리">
+          <div className={isFileTreeExpanded ? "file-tree expanded" : "file-tree collapsed"} aria-label="파일 트리">
             {fileTree.length > 0 ? (
               fileTree.map((node) => <FileTreeItem key={node.path} node={node} selectedExtensions={selectedExtensionSet} />)
             ) : (
               "파일이 없습니다"
             )}
           </div>
+          <button
+            className="file-tree-toggle"
+            type="button"
+            onClick={() => setIsFileTreeExpanded((expanded) => !expanded)}
+          >
+            {isFileTreeExpanded ? "접기 ▲" : "전체 보기 ▼"}
+          </button>
         </section>
 
         <section className="analyze-panel">
@@ -489,7 +498,7 @@ function projectDisplayName(project: CurrentProject | null, fallback: string | u
       return truncateProjectName(name);
     }
   }
-  return fallback ? `Project ${fallback.slice(0, 8)}` : "????";
+  return fallback ? `Project ${fallback.slice(0, 8)}` : "프로젝트";
 }
 
 function truncateProjectName(name: string) {
@@ -557,7 +566,7 @@ function PaperAnalysisSummary({
         <div className={paperStepClass(canPlan, normalizedWorkflowStatus !== "pending")}>
           <div className="paper-step-card-header">
             <div className="paper-step-title">
-              <span className="paper-step-index">{normalizedWorkflowStatus !== "pending" ? "✓" : "1"}</span>
+              <span className="paper-step-index">{"1"}</span>
               <h3>구조 설계</h3>
             </div>
             <StepStatusText isCompleted={normalizedWorkflowStatus !== "pending"} isActive={canPlan} />
@@ -579,7 +588,7 @@ function PaperAnalysisSummary({
                         <strong>{component.name}</strong>
                         <span>{component.description || "-"}</span>
                         <small>
-                          {component.category || "other"} ? {component.importance || "supporting"}
+                          {component.category || "other"} / {component.importance || "supporting"}
                         </small>
                       </li>
                     ))}
@@ -617,7 +626,7 @@ function PaperAnalysisSummary({
         <div className={paperStepClass(canGenerateCode || isCodegenRunning, normalizedWorkflowStatus === "code_generated")}>
           <div className="paper-step-card-header">
             <div className="paper-step-title">
-              <span className="paper-step-index">{normalizedWorkflowStatus === "code_generated" ? "✓" : "2"}</span>
+              <span className="paper-step-index">{"2"}</span>
               <h3>코드 생성</h3>
             </div>
             <StepStatusText
@@ -745,10 +754,10 @@ function fileCodegenClass(path: string, completedFiles: string[], currentFile: s
 
 function fileCodegenIcon(path: string, completedFiles: string[], currentFile: string | null) {
   if (completedFiles.includes(path)) {
-    return "✓";
+    return "OK";
   }
   if (path === currentFile) {
-    return "→";
+    return ">";
   }
   return "";
 }
@@ -820,11 +829,12 @@ function ProjectAnalysisSummary({
           <h3>구현 순서 미리보기 (총 {analysis.dependency_graph.implementation_order?.length ?? 0}개 문제)</h3>
           <ol>
             {order.slice(0, 8).map((item) => (
-              <li key={`${item.file}:${item.symbol}`}>
-                <span>{item.symbol}</span>
-                <small>
-                  {item.file} · {difficultyStarsFromDepth(item.depth)}
-                </small>
+              <li key={`${item.file}:${item.symbol}`} className="implementation-order-item">
+                <div className="implementation-order-main">
+                  <strong>{item.symbol}</strong>
+                  <span>{item.file}</span>
+                </div>
+                <small>{difficultyStarsFromDepth(item.depth)}</small>
               </li>
             ))}
           </ol>
@@ -889,25 +899,33 @@ function ExtensionSelector({
 
   return (
     <ul className="extension-selector">
-      {entries.map(([extension, count]) => (
-        <li key={extension}>
-          <label>
-            <input
-              type="checkbox"
-              checked={selected.has(extension)}
-              onChange={(event) => {
-                onChange(
-                  event.target.checked
-                    ? [...selectedExtensions, extension].sort((left, right) => left.localeCompare(right))
-                    : selectedExtensions.filter((selectedExtension) => selectedExtension !== extension),
-                );
-              }}
-            />
-            <span>{extension}</span>
-            <strong>({count}개 파일)</strong>
-          </label>
-        </li>
-      ))}
+      {entries.map(([extension, count]) => {
+        const isCodeExtension = DEFAULT_CODE_EXTENSIONS.has(extension.toLowerCase());
+        return (
+          <li key={extension} className={isCodeExtension ? undefined : "non-code-extension"}>
+            <label>
+              <input
+                type="checkbox"
+                checked={isCodeExtension && selected.has(extension)}
+                disabled={!isCodeExtension}
+                onChange={(event) => {
+                  if (!isCodeExtension) {
+                    return;
+                  }
+                  onChange(
+                    event.target.checked
+                      ? [...selectedExtensions, extension].sort((left, right) => left.localeCompare(right))
+                      : selectedExtensions.filter((selectedExtension) => selectedExtension !== extension),
+                  );
+                }}
+              />
+              <span>{extension}</span>
+              {!isCodeExtension ? <em>(코드 파일 아님)</em> : null}
+              <strong>({count}개 파일)</strong>
+            </label>
+          </li>
+        );
+      })}
     </ul>
   );
 }

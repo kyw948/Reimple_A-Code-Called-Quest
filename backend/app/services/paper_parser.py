@@ -33,7 +33,7 @@ def parse_arxiv(arxiv_url: str) -> PaperParseResponse:
     try:
         arxiv_id = extract_arxiv_id(arxiv_url)
     except ValueError as exc:
-        raise AppError("INVALID_ARXIV_URL", "??? arXiv URL? ?????.") from exc
+        raise AppError("INVALID_ARXIV_URL", "올바른 arXiv URL이 아닙니다.") from exc
 
     try:
         metadata_response = requests.get(f"http://export.arxiv.org/api/query?id_list={arxiv_id}", timeout=30)
@@ -48,9 +48,9 @@ def parse_arxiv(arxiv_url: str) -> PaperParseResponse:
     except AppError:
         raise
     except ValueError as exc:
-        raise AppError("PAPER_NOT_FOUND", "arXiv?? ??? ?? ? ????.") from exc
+        raise AppError("PAPER_NOT_FOUND", "arXiv에서 논문을 찾을 수 없습니다.") from exc
     except requests.RequestException as exc:
-        raise AppError("PAPER_NOT_FOUND", "arXiv ??? ???? ?????.") from exc
+        raise AppError("PAPER_NOT_FOUND", "arXiv 논문을 가져오지 못했습니다.") from exc
 
     return PaperParseResponse(
         title=metadata["title"],
@@ -85,7 +85,7 @@ def parse_pdf_upload(pdf_bytes: bytes, filename: str) -> PaperParseResponse:
 
 
 def extract_figures(pdf_bytes: bytes, max_figures: int = 10) -> list[dict]:
-    """Fallback: PDF? ??? ??? ??? ??? ????."""
+    """Fallback: PDF에 포함된 래스터 이미지를 추출합니다."""
     try:
         import fitz
     except ImportError as exc:
@@ -124,7 +124,7 @@ def extract_figures(pdf_bytes: bytes, max_figures: int = 10) -> list[dict]:
 
 
 def save_figures_for_parse(pdf_bytes: bytes) -> tuple[str | None, int]:
-    """Parse ????? PDF ??? ????. ?? figure? planning ?? ??? ????? ???."""
+    """Parse 단계에서는 PDF만 임시 저장합니다. 관련 figure는 planning 이후 렌더링합니다."""
     token = str(uuid.uuid4())
     tmp_root = _paper_base_dir() / "_tmp" / token
     tmp_root.mkdir(parents=True, exist_ok=True)
@@ -148,7 +148,7 @@ def promote_figures_for_project(project_id: str, figure_token: str | None) -> in
 
 
 def render_figure_page(pdf_bytes: bytes, page_number: int, dpi: int = 200) -> bytes:
-    """?? ???? PNG ???? ?????. ?? ???? ???? ?? ????."""
+    """특정 페이지를 PNG 이미지로 렌더링합니다. 벡터 그래픽도 함께 포함됩니다."""
     try:
         import fitz
     except ImportError as exc:
@@ -267,7 +267,7 @@ def _normalize_figure_number(figure_number: int | str) -> str:
 def parse_multipart_pdf(content_type: str, body: bytes) -> tuple[bytes, str]:
     boundary_match = re.search(r'boundary="?([^";]+)"?', content_type)
     if not boundary_match:
-        raise AppError("PDF_PARSE_FAILED", "PDF ??? ?? ??? ???? ????.")
+        raise AppError("PDF_PARSE_FAILED", "PDF 업로드 요청 형식이 올바르지 않습니다.")
 
     boundary = ("--" + boundary_match.group(1)).encode("utf-8")
     separator = bytes([13, 10, 13, 10])
@@ -283,10 +283,10 @@ def parse_multipart_pdf(content_type: str, body: bytes) -> tuple[bytes, str]:
         filename_match = re.search(r'filename="([^"]+)"', headers)
         filename = filename_match.group(1) if filename_match else "paper.pdf"
         if not content:
-            raise AppError("PDF_PARSE_FAILED", "PDF ??? ?? ????.")
+            raise AppError("PDF_PARSE_FAILED", "PDF 파일이 비어 있습니다.")
         return content, filename
 
-    raise AppError("PDF_PARSE_FAILED", "PDF ??? ?????.")
+    raise AppError("PDF_PARSE_FAILED", "업로드된 PDF 파일을 찾지 못했습니다.")
 
 
 def extract_arxiv_id(url: str) -> str:
@@ -323,7 +323,7 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
     try:
         import fitz
     except ImportError as exc:
-        raise AppError("PDF_PARSE_FAILED", "PyMuPDF? ???? ?? ?? PDF? ?? ? ????.") from exc
+        raise AppError("PDF_PARSE_FAILED", "PyMuPDF가 설치되어 있지 않아 PDF를 읽을 수 없습니다.") from exc
 
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -332,14 +332,14 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
         finally:
             doc.close()
     except Exception as exc:
-        raise AppError("PDF_PARSE_FAILED", "PDF ??? ??? ??????.") from exc
+        raise AppError("PDF_PARSE_FAILED", "PDF 텍스트 추출에 실패했습니다.") from exc
 
     full_text = chr(10).join(text_parts).strip()
     if not full_text:
-        raise AppError("PDF_PARSE_FAILED", "PDF?? ???? ???? ?????.")
+        raise AppError("PDF_PARSE_FAILED", "PDF에서 텍스트를 추출하지 못했습니다.")
 
     if len(full_text) > MAX_PAPER_CONTENT_CHARS:
-        return full_text[:MAX_PAPER_CONTENT_CHARS] + chr(10) + chr(10) + "[... ?? ?? ?? ...]"
+        return full_text[:MAX_PAPER_CONTENT_CHARS] + chr(10) + chr(10) + "[... 내용 일부 생략 ...]"
     return full_text
 
 
