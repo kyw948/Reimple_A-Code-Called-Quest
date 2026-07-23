@@ -284,7 +284,6 @@ Response:
   - 예: src/model.py > forward, src/model.py > init_weights
 - 오른쪽 패널에 "힌트 보기" 버튼 추가
 - LLM 채점 문제는 결과에 feedback 표시
-- 문제 목록에 채점 방식 아이콘 (pytest: 🧪, llm: 🤖)
 
 ## 환경변수 추가
 ```env

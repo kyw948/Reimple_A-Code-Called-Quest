@@ -48,3 +48,16 @@ AI 연구 논문의 Python repository를 코딩 연습 문제로 변환하는 lo
 - docs/PROBLEM_GENERATION.md: 분석 파이프라인 + 문제 트리 상세
 - docs/MVP-1.md, docs/MVP-2.md: 기능 명세
 - docs/API.md: API 명세
+
+
+## 필수 규칙
+
+### 파일 인코딩
+- 모든 파일은 UTF-8로 읽고 써야 한다
+- Python에서 파일 읽기/쓰기 시 반드시 encoding="utf-8" 명시
+  - open(path, "r", encoding="utf-8")
+  - open(path, "w", encoding="utf-8")
+  - Path.read_text(encoding="utf-8")
+  - Path.write_text(content, encoding="utf-8")
+- 한글이 포함된 문자열이 깨지면 안 된다
+- 파일 수정 시 기존 한글 내용을 ??로 바꾸지 마라

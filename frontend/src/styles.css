@@ -1,6 +1,6 @@
 :root {
   color: #202124;
-  background: #f6f7f9;
+  background: #ffffff;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
@@ -42,10 +42,6 @@
   background: rgb(255 255 255 / 10%);
   font-size: 11px;
   font-weight: 750;
-}
-
-.grading-icon {
-  flex: 0 0 auto;
 }
 
 .feedback-block {
@@ -292,6 +288,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: #ffffff;
+  color: #202124;
 }
 
 button,
@@ -509,8 +507,14 @@ button {
 }
 
 .paper-step-action:disabled {
-  cursor: wait;
-  opacity: 0.72;
+  cursor: not-allowed;
+  color: #ffffff;
+  background: #9ca3af;
+  opacity: 1;
+}
+
+.paper-step-action.practice:disabled {
+  background: #9ca3af;
 }
 
 .paper-step-details summary {
@@ -522,6 +526,97 @@ button {
 
 .paper-step-details .paper-plan-results {
   margin-top: 14px;
+}
+
+.architecture-structure-section {
+  display: grid;
+  gap: 14px;
+}
+
+.architecture-structure-section > h3,
+.architecture-structure-section > p {
+  margin: 0;
+}
+
+.architecture-structure-section > p {
+  color: #4b5563;
+  line-height: 1.55;
+}
+
+.architecture-dependency-tree {
+  display: grid;
+  gap: 3px;
+  margin-top: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px 16px;
+  color: #111827;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+.architecture-tree-line {
+  display: flex;
+  min-width: max-content;
+  align-items: baseline;
+  gap: 6px;
+  white-space: pre;
+}
+
+.architecture-tree-prefix {
+  color: #6b7280;
+  white-space: pre;
+}
+
+.architecture-tree-name {
+  color: #111827;
+  font-weight: 800;
+}
+
+.architecture-tree-name.core {
+  color: #1d4ed8;
+}
+
+.architecture-tree-separator,
+.architecture-tree-description,
+.architecture-tree-dependencies {
+  color: #6b7280;
+  font-size: 13px;
+  white-space: normal;
+}
+
+.architecture-tree-dependencies {
+  color: #4b5563;
+}
+
+.compact-details summary {
+  width: fit-content;
+  color: #1666c5;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.compact-details.analysis-modules ul li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 3px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.compact-details.analysis-modules ul li span {
+  grid-column: 2;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.compact-details.analysis-modules ul li small {
+  display: none;
 }
 
 .progress-bar {
@@ -549,9 +644,9 @@ button {
 
 .codegen-file-list li {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   padding: 6px 8px;
   border-radius: 6px;
   color: #4b5563;
@@ -571,11 +666,19 @@ button {
   color: #6b7280;
 }
 
-.codegen-file-list li span:nth-child(2) {
+.codegen-file-name {
   min-width: 0;
+  justify-self: stretch;
   text-align: left;
-  justify-self: start;
   overflow-wrap: anywhere;
+}
+
+.codegen-file-state {
+  justify-self: end;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
 }
 
 .setup-tabs button {
@@ -1823,8 +1926,7 @@ button {
   font-weight: 700;
 }
 
-.difficulty-stars,
-.grading-icon {
+.difficulty-stars {
   color: #6b7280;
   font-size: 12px;
   text-align: right;
@@ -2199,4 +2301,117 @@ button {
   .problem-sidebar.open {
     display: block;
   }
+}
+
+.codegen-status .codegen-file-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, auto);
+  align-items: center;
+  gap: 12px;
+}
+
+.codegen-status .codegen-file-list li::before {
+  content: none;
+}
+
+.codegen-status .codegen-file-name {
+  min-width: 0;
+  justify-self: stretch;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.codegen-status .codegen-file-state {
+  justify-self: end;
+  min-width: 72px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+
+.analysis-modules .module-summary-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-modules .module-summary-item {
+  display: block;
+  min-width: 0;
+  padding: 0;
+}
+
+.analysis-modules .module-summary-item::before {
+  content: none;
+}
+
+.module-summary-item details {
+  border: 1px solid #e5e8ef;
+  border-radius: 6px;
+  background: #fbfcfe;
+}
+
+.module-summary-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.module-summary-main {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.module-summary-main strong {
+  flex: 0 0 auto;
+  min-width: 80px;
+  color: #111827;
+  font-weight: 800;
+}
+
+.module-summary-main span {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #374151;
+  overflow-wrap: anywhere;
+}
+
+.module-summary-item summary small {
+  flex: 0 0 auto;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.analysis-modules .module-file-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 7px 10px 10px 28px;
+  border-top: 1px solid #eef1f5;
+  list-style: none;
+}
+
+.analysis-modules .module-file-list li {
+  display: block;
+  min-width: 0;
+  padding: 2px 0;
+  color: #4b5563;
+  font-family: Consolas, "SFMono-Regular", "Roboto Mono", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.analysis-modules .module-file-list li::before {
+  content: none;
 }

@@ -29,9 +29,10 @@ class ProblemSubmitResponse(BaseModel):
     feedback: str | None = None
     score: int | None = None
     test_cases: list[dict] | None = None
+    grading_detail: str | None = None
     stdout: str | None
     stderr: str | None
-    duration_ms: int
+    duration_ms: int | None
     saved_path: str | None
     grading_method: str
 
@@ -100,6 +101,7 @@ def _submit_pytest_problem(problem, project, payload: ProblemSubmitRequest) -> P
         feedback=None,
         score=None,
         test_cases=None,
+        grading_detail=None,
         stdout=result.stdout,
         stderr=result.stderr,
         duration_ms=duration_ms,
@@ -135,14 +137,17 @@ def _submit_llm_problem(problem, project, payload: ProblemSubmitRequest) -> Prob
     if grade.passed:
         _mark_problem_passed(problem)
 
+    response_duration_ms = duration_ms if grade.test_cases is not None else None
+
     return ProblemSubmitResponse(
         passed=grade.passed,
         feedback=grade.feedback,
         score=grade.score,
         test_cases=[result.__dict__ for result in grade.test_cases] if grade.test_cases is not None else None,
+        grading_detail=grade.grading_detail,
         stdout=None,
         stderr=None,
-        duration_ms=duration_ms,
+        duration_ms=response_duration_ms,
         saved_path=saved_path,
         grading_method="llm",
     )

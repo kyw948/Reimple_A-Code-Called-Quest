@@ -130,11 +130,6 @@ const CANDIDATE_STATUS_ICON: Record<Candidate["status"], string> = {
   error: "!",
 };
 
-const GRADING_ICON: Record<Problem["grading_method"], string> = {
-  pytest: "🧪",
-  llm: "🤖",
-};
-
 export function PracticePage() {
   const { id } = useParams();
 
@@ -604,6 +599,7 @@ export function PracticePage() {
               <Editor
                 height="52vh"
                 language="python"
+                theme="vs-dark"
                 value={editorCode}
                 onChange={(value) => {
                   if (currentProblem.status !== "locked") {
@@ -986,7 +982,6 @@ function TreeNode({
   const status = item.kind === "problem" ? item.problem.status : item.candidate.status;
   const symbol = item.kind === "problem" ? item.problem.target_symbol : item.candidate.symbol;
   const difficulty = item.kind === "problem" ? item.problem.difficulty : item.candidate.difficulty;
-  const gradingMethod = item.kind === "problem" ? item.problem.grading_method : "llm";
   const icon = item.kind === "problem" ? STATUS_ICON[item.problem.status] : CANDIDATE_STATUS_ICON[item.candidate.status];
   return (
     <li>
@@ -1001,9 +996,6 @@ function TreeNode({
           {isInvalid || status === "skipped" || status === "error" ? `${shortSymbol(symbol)} (찾을 수 없음)` : shortSymbol(symbol)}
         </span>
         <span className="difficulty-stars">{difficultyStars(difficulty)}</span>
-        <span className="grading-icon" title={gradingMethod}>
-          {GRADING_ICON[gradingMethod]}
-        </span>
       </button>
     </li>
   );
@@ -1420,10 +1412,13 @@ function ResultPanel({
         {result.grading_method === "llm" ? " (LLM 채점)" : ""}
       </p>
 
-      {result.grading_method === "llm" && totalCaseCount > 0 ? (
+      {result.grading_method === "llm" ? (
         <p className="case-summary">
-          테스트 케이스 {passedCaseCount}/{totalCaseCount} 통과
-          {result.score !== null ? ` · ${result.score}점` : ""}
+          {result.grading_detail ??
+            (totalCaseCount > 0
+              ? `테스트 케이스 ${passedCaseCount}/${totalCaseCount} 통과`
+              : "LLM 코드 비교 채점")}
+          {result.score !== null ? ` : ${result.score}점` : ""}
         </p>
       ) : null}
 
@@ -1465,10 +1460,12 @@ function ResultPanel({
       ) : null}
 
       <dl className="result-meta">
-        <div>
-          <dt>소요 시간</dt>
-          <dd>{result.duration_ms}ms</dd>
-        </div>
+        {result.duration_ms !== null ? (
+          <div>
+            <dt>소요 시간</dt>
+            <dd>{result.duration_ms}ms</dd>
+          </div>
+        ) : null}
         <div>
           <dt>저장 경로</dt>
           <dd>{result.saved_path ?? "-"}</dd>

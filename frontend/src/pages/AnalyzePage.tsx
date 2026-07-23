@@ -48,6 +48,7 @@ type PaperPlanResponse = {
       classes?: string[];
       functions?: string[];
       depends_on?: string[];
+      importance?: string;
     }>;
   };
   logic_design: {
@@ -159,6 +160,8 @@ export function AnalyzePage() {
   const setExtensionStats = useProjectStore((state) => state.setExtensionStats);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isPlanningPaper, setIsPlanningPaper] = useState(false);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isPreparingPractice, setIsPreparingPractice] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -313,6 +316,7 @@ export function AnalyzePage() {
       return;
     }
 
+    setIsPlanningPaper(true);
     setErrorMessage("");
     setStatusText("논문 분석 중... (1/3 핵심 컴포넌트 추출)");
     try {
@@ -325,6 +329,8 @@ export function AnalyzePage() {
     } catch (error) {
       setErrorMessage(getErrorMessage(error, "논문 구조 설계에 실패했습니다"));
       setStatusText("");
+    } finally {
+      setIsPlanningPaper(false);
     }
   }
 
@@ -342,6 +348,7 @@ export function AnalyzePage() {
       setCodegenStatus(firstStatus.data);
       if (firstStatus.data.status === "completed") {
         setPaperWorkflowStatus("code_generated");
+        setIsGeneratingCode(false);
       }
 
       const intervalId = window.setInterval(async () => {
@@ -435,6 +442,8 @@ export function AnalyzePage() {
           onStartPlan={handleStartPaperPlan}
           onStartCodeGeneration={handleStartCodeGeneration}
           onStartGeneratedPractice={handleStartGeneratedPractice}
+          isPlanningPaper={isPlanningPaper}
+          isGeneratingCode={isGeneratingCode}
           isPreparingPractice={isPreparingPractice}
         />
       ) : (
@@ -515,6 +524,8 @@ function PaperAnalysisSummary({
   onStartPlan,
   onStartCodeGeneration,
   onStartGeneratedPractice,
+  isPlanningPaper,
+  isGeneratingCode,
   isPreparingPractice,
 }: {
   project: CurrentProject | null;
@@ -526,6 +537,8 @@ function PaperAnalysisSummary({
   onStartPlan: () => void;
   onStartCodeGeneration: () => void;
   onStartGeneratedPractice: () => void;
+  isPlanningPaper: boolean;
+  isGeneratingCode: boolean;
   isPreparingPractice: boolean;
 }) {
   const components = plan?.overall_plan.components ?? [];
@@ -537,8 +550,8 @@ function PaperAnalysisSummary({
   const codegenPercent = Math.round((codegenStatus?.progress ?? 0) * 100);
   const normalizedWorkflowStatus = workflowStatus === "completed" ? "code_generated" : workflowStatus;
   const isCodegenComplete = codegenStatus?.status === "completed" || normalizedWorkflowStatus === "code_generated";
-  const isCodegenRunning = codegenStatus?.status === "running";
-  const canPlan = normalizedWorkflowStatus === "pending" && !plan;
+  const isCodegenRunning = codegenStatus?.status === "running" || isGeneratingCode;
+  const canPlan = normalizedWorkflowStatus === "pending" && !plan && !isPlanningPaper;
   const canGenerateCode = Boolean(plan) && normalizedWorkflowStatus === "planned" && !isCodegenRunning;
   const canStartPractice = normalizedWorkflowStatus === "code_generated";
   const authors = paperMetadata?.authors ?? [];
@@ -571,41 +584,41 @@ function PaperAnalysisSummary({
             </div>
             <StepStatusText isCompleted={normalizedWorkflowStatus !== "pending"} isActive={canPlan} />
           </div>
-          {canPlan ? (
-            <button className="paper-step-action" type="button" onClick={onStartPlan} disabled={isCodegenRunning}>
-              구조 설계 시작
+          {canPlan || isPlanningPaper ? (
+            <button className="paper-step-action" type="button" onClick={onStartPlan} disabled={isPlanningPaper || isCodegenRunning}>
+              {isPlanningPaper ? "구조 설계 중..." : "구조 설계 시작"}
             </button>
           ) : plan ? (
             <details className="paper-step-details">
               <summary>설계 결과 보기</summary>
               <div className="paper-plan-results">
-                <section className="analysis-modules">
-                  <h3>핵심 컴포넌트</h3>
-                  <p>{plan.overall_plan.summary || "요약 없음"}</p>
-                  <ul>
-                    {components.map((component) => (
-                      <li key={component.name}>
-                        <strong>{component.name}</strong>
-                        <span>{component.description || "-"}</span>
-                        <small>
-                          {component.category || "other"} / {component.importance || "supporting"}
-                        </small>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-
-                <section className="analysis-modules">
-                  <h3>파일 구조</h3>
-                  <ul>
-                    {files.map((file) => (
-                      <li key={file.path}>
-                        <strong>{file.path}</strong>
-                        <span>{file.description || "-"}</span>
-                        <small>{[...(file.classes ?? []), ...(file.functions ?? [])].join(", ") || "구성 요소 없음"}</small>
-                      </li>
-                    ))}
-                  </ul>
+                <section className="architecture-structure-section">
+                  <h3>아키텍처 구조</h3>
+                  {plan.overall_plan.summary ? <p>{plan.overall_plan.summary}</p> : null}
+                  <ArchitectureDependencyFlow nodes={buildPaperArchitectureNodes(files, components)} />
+                  <details className="analysis-modules compact-details">
+                    <summary>컴포넌트 목록 보기</summary>
+                    <ul>
+                      {components.map((component) => (
+                        <li key={component.name}>
+                          <strong>{component.name}</strong>
+                          <span>{component.description || "-"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                  <details className="analysis-modules compact-details">
+                    <summary>파일 구조 보기</summary>
+                    <ul>
+                      {files.map((file) => (
+                        <li key={file.path}>
+                          <strong>{file.path}</strong>
+                          <span>{file.description || "-"}</span>
+                          <small>{[...(file.classes ?? []), ...(file.functions ?? [])].join(", ") || "구성 요소 없음"}</small>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 </section>
 
                 <section className="analysis-modules">
@@ -635,9 +648,9 @@ function PaperAnalysisSummary({
               pendingText="이전 단계 완료 후 가능"
             />
           </div>
-          {canGenerateCode ? (
-            <button className="paper-step-action" type="button" onClick={onStartCodeGeneration}>
-              코드 생성 시작
+          {canGenerateCode || isGeneratingCode ? (
+            <button className="paper-step-action" type="button" onClick={onStartCodeGeneration} disabled={isGeneratingCode}>
+              {isGeneratingCode ? "코드 생성 중..." : "코드 생성 시작"}
             </button>
           ) : normalizedWorkflowStatus === "pending" ? null : codegenStatus ? (
             <section className="analysis-modules codegen-status">
@@ -655,9 +668,8 @@ function PaperAnalysisSummary({
               <ul className="codegen-file-list">
                 {displayFiles.map((path) => (
                   <li key={path} className={fileCodegenClass(path, completedFiles, codegenStatus.current_file ?? null)}>
-                    <span>{fileCodegenIcon(path, completedFiles, codegenStatus.current_file ?? null)}</span>
-                    <span>{path}</span>
-                    {path === codegenStatus.current_file ? <small>생성 중...</small> : null}
+                    <span className="codegen-file-name">{path}</span>
+                    <span className="codegen-file-state">{fileCodegenIcon(path, completedFiles, codegenStatus.current_file ?? null)}</span>
                   </li>
                 ))}
               </ul>
@@ -690,7 +702,7 @@ function PaperAnalysisSummary({
           </div>
           {canStartPractice ? (
             <button className="paper-step-action practice" type="button" onClick={onStartGeneratedPractice} disabled={isPreparingPractice}>
-              연습 시작
+              {isPreparingPractice ? "연습 준비 중..." : "연습 시작"}
             </button>
           ) : null}
         </div>
@@ -757,9 +769,176 @@ function fileCodegenIcon(path: string, completedFiles: string[], currentFile: st
     return "OK";
   }
   if (path === currentFile) {
-    return ">";
+    return "생성 중...";
   }
   return "";
+}
+
+type ArchitectureFlowNode = {
+  path: string;
+  description: string;
+  dependsOn: string[];
+  isCore?: boolean;
+};
+
+type ArchitectureTreeLine = {
+  key: string;
+  depth: number;
+  connector: string;
+  label: string;
+  description: string;
+  dependsOn: string[];
+  isDirectory: boolean;
+  isCore?: boolean;
+};
+
+function ArchitectureDependencyFlow({ nodes }: { nodes: ArchitectureFlowNode[] }) {
+  if (nodes.length === 0) {
+    return null;
+  }
+
+  const lines = buildArchitectureTreeLines(nodes);
+
+  return (
+    <div className="architecture-dependency-tree" aria-label="아키텍처 구조">
+      {lines.map((line) => (
+        <div className={line.isDirectory ? "architecture-tree-line directory" : "architecture-tree-line file"} key={line.key}>
+          <span className="architecture-tree-prefix">{line.depth > 0 ? `${"  ".repeat(line.depth - 1)}${line.connector}` : ""}</span>
+          <span className={line.isCore ? "architecture-tree-name core" : "architecture-tree-name"}>{line.label}</span>
+          {!line.isDirectory ? <span className="architecture-tree-separator">---</span> : null}
+          {!line.isDirectory ? <span className="architecture-tree-description">{line.description || "-"}</span> : null}
+          {!line.isDirectory && line.dependsOn.length > 0 ? (
+            <span className="architecture-tree-dependencies"> -&gt; {shortDependencyList(line.dependsOn)} 사용</span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function buildArchitectureTreeLines(nodes: ArchitectureFlowNode[]): ArchitectureTreeLine[] {
+  const byDirectory = new Map<string, ArchitectureFlowNode[]>();
+  const rootFiles: ArchitectureFlowNode[] = [];
+
+  for (const node of nodes) {
+    const normalizedPath = normalizePath(node.path);
+    const slashIndex = normalizedPath.indexOf("/");
+    if (slashIndex === -1) {
+      rootFiles.push({ ...node, path: normalizedPath });
+      continue;
+    }
+    const directory = normalizedPath.slice(0, slashIndex);
+    const rest = normalizedPath.slice(slashIndex + 1);
+    byDirectory.set(directory, [...(byDirectory.get(directory) ?? []), { ...node, path: rest }]);
+  }
+
+  const lines: ArchitectureTreeLine[] = [];
+  for (const file of rootFiles.sort(compareNodesByPath)) {
+    lines.push(fileLine(file, 0, ""));
+  }
+
+  for (const [directory, files] of [...byDirectory.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    lines.push({
+      key: `dir:${directory}`,
+      depth: 0,
+      connector: "",
+      label: `${directory}/`,
+      description: "",
+      dependsOn: [],
+      isDirectory: true,
+    });
+    const sortedFiles = files.sort(compareNodesByPath);
+    sortedFiles.forEach((file, index) => {
+      lines.push(fileLine(file, 1, index === sortedFiles.length - 1 ? "`--" : "|--", `${directory}/`));
+    });
+  }
+
+  return lines;
+}
+
+function fileLine(node: ArchitectureFlowNode, depth: number, connector: string, keyPrefix = ""): ArchitectureTreeLine {
+  return {
+    key: `${keyPrefix}${node.path}`,
+    depth,
+    connector,
+    label: normalizePath(node.path),
+    description: node.isCore ? `${node.description} (core)` : node.description,
+    dependsOn: node.dependsOn.map((dependency) => normalizePath(dependency).split("/").at(-1) ?? dependency),
+    isDirectory: false,
+    isCore: node.isCore,
+  };
+}
+
+function compareNodesByPath(left: ArchitectureFlowNode, right: ArchitectureFlowNode) {
+  return normalizePath(left.path).localeCompare(normalizePath(right.path));
+}
+
+function shortDependencyList(dependencies: string[]) {
+  return dependencies.join(", ");
+}
+
+function normalizePath(path: string) {
+  return path.replaceAll("\\", "/");
+}
+
+
+function buildPaperArchitectureNodes(
+  files: NonNullable<PaperPlanResponse["architecture"]["files"]>,
+  components: NonNullable<PaperPlanResponse["overall_plan"]["components"]>,
+): ArchitectureFlowNode[] {
+  return files.map((file) => ({
+    path: file.path,
+    description: file.description || [...(file.classes ?? []), ...(file.functions ?? [])].join(", ") || "-",
+    dependsOn: normalizeDependencies(file.depends_on ?? []),
+    isCore: file.importance === "core" || components.some((component) => component.importance === "core" && componentMatchesFile(component.name, file)),
+  }));
+}
+
+function buildProjectArchitectureNodes(analysis: ProjectAnalyzeResponse): ArchitectureFlowNode[] {
+  const descriptions = new Map<string, string>();
+  for (const module of Object.values(analysis.architecture.modules ?? {})) {
+    for (const file of module.files) {
+      descriptions.set(file, module.description);
+    }
+  }
+
+  const dependencyEntries = Object.entries(analysis.architecture.file_dependencies ?? {});
+  const orderedFiles = new Set<string>();
+  for (const item of analysis.dependency_graph.implementation_order ?? []) {
+    orderedFiles.add(item.file);
+  }
+  for (const [file, dependencies] of dependencyEntries) {
+    orderedFiles.add(file);
+    for (const dependency of dependencies) {
+      orderedFiles.add(dependency);
+    }
+  }
+  for (const module of Object.values(analysis.architecture.modules ?? {})) {
+    for (const file of module.files) {
+      orderedFiles.add(file);
+    }
+  }
+
+  return [...orderedFiles].map((file) => ({
+    path: file,
+    description: descriptions.get(file) ?? "-",
+    dependsOn: normalizeDependencies(analysis.architecture.file_dependencies?.[file] ?? []),
+    isCore: ["model", "training", "data"].some((moduleName) => analysis.architecture.modules?.[moduleName]?.files.includes(file)),
+  }));
+}
+
+function normalizeDependencies(dependencies: string[]) {
+  return dependencies.map((dependency) => dependency.replaceAll("\\", "/")).filter(Boolean);
+}
+
+function componentMatchesFile(componentName: string, file: { path: string; classes?: string[]; functions?: string[] }) {
+  const normalizedComponent = normalizeLooseName(componentName);
+  const fileParts = [file.path, ...(file.classes ?? []), ...(file.functions ?? [])].map(normalizeLooseName);
+  return fileParts.some((part) => part.includes(normalizedComponent) || normalizedComponent.includes(part));
+}
+
+function normalizeLooseName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function ProjectAnalysisSummary({
@@ -770,7 +949,8 @@ function ProjectAnalysisSummary({
   const allModules = Object.entries(analysis.architecture.modules ?? {});
   const problemModules = allModules.filter(([name]) => ["model", "training", "data"].includes(name));
   const excludedModules = allModules.filter(([name]) => !["model", "training", "data"].includes(name));
-  const order = (analysis.dependency_graph.implementation_order ?? []).slice(0, 10);
+  const order = analysis.dependency_graph.implementation_order ?? [];
+  const hasDepthProgression = order.some((item) => item.depth > 0);
 
   return (
     <section className="project-analysis-summary">
@@ -794,64 +974,82 @@ function ProjectAnalysisSummary({
         </div>
       </dl>
 
+      <ArchitectureDependencyFlow nodes={buildProjectArchitectureNodes(analysis)} />
+
       {problemModules.length > 0 ? (
         <div className="analysis-modules">
           <h3>문제 대상 모듈</h3>
-          <ul>
-            {problemModules.map(([name, module]) => (
-              <li key={name}>
-                <strong>{name}</strong>
-                <span>{module.description}</span>
-                <small>{module.files.length}개 파일</small>
-              </li>
-            ))}
-          </ul>
+          <ModuleFileList modules={problemModules} />
         </div>
       ) : null}
 
       {excludedModules.length > 0 ? (
         <details className="analysis-modules excluded-modules">
           <summary>제외된 모듈 보기</summary>
-          <ul>
-            {excludedModules.map(([name, module]) => (
-              <li key={name}>
-                <strong>{name}</strong>
-                <span>{module.description}</span>
-                <small>{module.files.length}개 파일</small>
-              </li>
-            ))}
-          </ul>
+          <ModuleFileList modules={excludedModules} />
         </details>
       ) : null}
 
       {order.length > 0 ? (
-        <div className="analysis-modules">
-          <h3>구현 순서 미리보기 (총 {analysis.dependency_graph.implementation_order?.length ?? 0}개 문제)</h3>
+        <details className="analysis-modules implementation-order-details" open>
+          <summary>구현 순서 미리보기 (총 {order.length}개 문제)</summary>
           <ol>
-            {order.slice(0, 8).map((item) => (
+            {order.map((item, index) => (
               <li key={`${item.file}:${item.symbol}`} className="implementation-order-item">
                 <div className="implementation-order-main">
                   <strong>{item.symbol}</strong>
                   <span>{item.file}</span>
                 </div>
-                <small>{difficultyStarsFromDepth(item.depth)}</small>
+                <small>{difficultyStarsFromDepth(item.depth, index, order.length, hasDepthProgression)}</small>
               </li>
             ))}
           </ol>
-        </div>
+        </details>
       ) : null}
     </section>
   );
 }
 
-function difficultyStarsFromDepth(depth: number) {
-  if (depth >= 2) {
-    return "★★★";
+function difficultyStarsFromDepth(depth: number, index: number, total: number, hasDepthProgression: boolean) {
+  const filled = String.fromCharCode(0x2605);
+  const empty = String.fromCharCode(0x2606);
+  let filledCount = depth >= 2 ? 3 : depth === 1 ? 2 : 1;
+
+  if (!hasDepthProgression && total > 1) {
+    const progress = index / Math.max(total - 1, 1);
+    filledCount = progress >= 0.66 ? 3 : progress >= 0.33 ? 2 : 1;
   }
-  if (depth === 1) {
-    return "★★☆";
-  }
-  return "★☆☆";
+
+  return filled.repeat(filledCount) + empty.repeat(3 - filledCount);
+}
+
+function formatFileCount(count: number) {
+  return `${count}${String.fromCharCode(0xac1c)} ${String.fromCharCode(0xd30c, 0xc77c)}`;
+}
+
+function ModuleFileList({ modules }: { modules: Array<[string, { description: string; files: string[] }]> }) {
+  return (
+    <ul className="module-summary-list">
+      {modules.map(([name, module]) => (
+        <li key={name} className="module-summary-item">
+          <details>
+            <summary>
+              <span className="module-summary-main">
+                <strong>{name}</strong>
+                <span>{module.description}</span>
+              </span>
+              <small>{formatFileCount(module.files.length)}</small>
+            </summary>
+            <ul className="module-file-list">
+              {module.files.map((file) => (
+                <li key={file}>{file}</li>
+              ))}
+            </ul>
+          </details>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function FileTreeItem({ node, selectedExtensions }: { node: FileTreeNode; selectedExtensions: Set<string> }) {

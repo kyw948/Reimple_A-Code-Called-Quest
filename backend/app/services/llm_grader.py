@@ -1,4 +1,5 @@
 import ast
+import importlib
 import json
 import subprocess
 import sys
@@ -36,6 +37,7 @@ class LlmGradeResult:
     feedback: str
     score: int | None = None
     test_cases: list[LlmTestCaseResult] | None = None
+    grading_detail: str | None = None
 
 
 def grade_llm_submission(
@@ -82,7 +84,11 @@ def grade_llm_submission(
         try:
             return _legacy_grade_from_response(raw_response)
         except (json.JSONDecodeError, ValueError):
-            return _grade_with_legacy_comparison(original_code, submitted_function)
+            return _grade_with_code_comparison(original_code, submitted_code, target_symbol)
+
+    imports_ok, missing_imports = check_imports(submitted_code)
+    if not imports_ok:
+        return _grade_with_code_comparison(original_code, submitted_code, target_symbol, missing_imports=missing_imports)
 
     test_results = [_run_and_compare_test_case(submitted_code, test_case) for test_case in test_cases]
     passed_count = sum(1 for result in test_results if result.passed)
@@ -102,8 +108,53 @@ def grade_llm_submission(
         feedback=feedback,
         score=score,
         test_cases=test_results,
+        grading_detail=f"{StringMessages.TEST_CASES} {passed_count}/{total_count} {StringMessages.PASSED}",
     )
 
+
+
+class StringMessages:
+    TEST_CASES = "\ud14c\uc2a4\ud2b8 \ucf00\uc774\uc2a4"
+    PASSED = "\ud1b5\uacfc"
+    CODE_COMPARISON = "LLM \ucf54\ub4dc \ube44\uad50 \ucc44\uc810"
+    API_KEY_REQUIRED = "LLM \ucc44\uc810\uc744 \uc704\ud574 GEMINI_API_KEY\uac00 \ud544\uc694\ud569\ub2c8\ub2e4"
+    GRADING_ERROR = "\ucc44\uc810 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4"
+
+
+def check_imports(code: str) -> tuple[bool, list[str]]:
+    """Return whether imports in submitted code are available in the current environment."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return False, ["syntax error"]
+
+    missing: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module = alias.name.split(".")[0]
+                if module and not _can_import_module(module):
+                    missing.append(module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level > 0:
+                module = node.module.split(".")[0] if node.module else "relative import"
+                missing.append(module)
+                continue
+            if node.module:
+                module = node.module.split(".")[0]
+                if module and not _can_import_module(module):
+                    missing.append(module)
+
+    unique_missing = sorted(set(missing))
+    return len(unique_missing) == 0, unique_missing
+
+
+def _can_import_module(module: str) -> bool:
+    try:
+        importlib.import_module(module)
+        return True
+    except ImportError:
+        return False
 
 def _grade_non_python_submission(
     original_code: str,
@@ -122,7 +173,9 @@ def _grade_non_python_submission(
             if _last_validation_error_code() == "LLM_API_KEY_MISSING" or not llm_client.get_gemini_api_key():
                 return LlmGradeResult(passed=False, feedback="LLM 채점을 위해 GEMINI_API_KEY가 필요합니다")
             raise ValueError("Invalid non-Python grade response.")
-        return _legacy_grade_from_response(parsed_response)
+        result = _legacy_grade_from_response(parsed_response)
+        result.grading_detail = StringMessages.CODE_COMPARISON
+        return result
     except AppError as exc:
         if exc.detail.get("error_code") == "LLM_API_KEY_MISSING":
             return LlmGradeResult(passed=False, feedback="LLM 채점을 위해 GEMINI_API_KEY가 필요합니다")
@@ -299,6 +352,36 @@ def _legacy_grade_from_response(raw_response: str | dict) -> LlmGradeResult:
     )
 
 
+
+def _grade_with_code_comparison(
+    original_code: str,
+    submitted_code: str,
+    target_symbol: str,
+    missing_imports: list[str] | None = None,
+) -> LlmGradeResult:
+    try:
+        parsed_response = llm_client.call_gemini_with_validation(
+            _build_code_comparison_prompt(original_code, submitted_code, target_symbol),
+            SYSTEM_INSTRUCTION,
+            {"passed": bool},
+            max_retries=1,
+        )
+        if parsed_response is None or not isinstance(parsed_response, dict):
+            if _last_validation_error_code() == "LLM_API_KEY_MISSING" or not llm_client.get_gemini_api_key():
+                return LlmGradeResult(passed=False, feedback=StringMessages.API_KEY_REQUIRED, grading_detail=StringMessages.CODE_COMPARISON)
+            raise ValueError("Invalid code comparison response.")
+        result = _legacy_grade_from_response(parsed_response)
+        result.grading_detail = StringMessages.CODE_COMPARISON
+        if missing_imports:
+            result.feedback = f"{StringMessages.CODE_COMPARISON}: " + result.feedback
+        return result
+    except AppError as exc:
+        if exc.detail.get("error_code") == "LLM_API_KEY_MISSING":
+            return LlmGradeResult(passed=False, feedback=StringMessages.API_KEY_REQUIRED, grading_detail=StringMessages.CODE_COMPARISON)
+        raise
+    except (json.JSONDecodeError, ValueError):
+        return LlmGradeResult(passed=False, feedback=StringMessages.GRADING_ERROR, grading_detail=StringMessages.CODE_COMPARISON)
+
 def _grade_with_full_code_fallback(original_code: str, submitted_code: str, target_symbol: str) -> LlmGradeResult:
     try:
         parsed_response = llm_client.call_gemini_with_validation(
@@ -444,6 +527,35 @@ def _normalize_score(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
 
+
+
+def _build_code_comparison_prompt(original_code: str, submitted_code: str, target_symbol: str) -> str:
+    return f"""아래 두 코드를 비교하여 제출 코드가 원본과 동일한 기능을 구현하는지 판단해주세요.
+
+## 원본 코드 (정답)
+```
+{original_code}
+```
+
+## 제출 코드
+```
+{submitted_code}
+```
+
+## 함수명
+{target_symbol}
+
+판단 기준:
+- 핵심 로직이 동일한지 확인하세요. 변수명이나 포맷 차이는 무시하세요.
+- 알고리즘이 동일한지 확인하세요.
+- edge case 처리가 동일한지 확인하세요.
+
+아래 JSON 형식으로만 응답하세요:
+{{
+  "passed": true 또는 false,
+  "score": 0~100,
+  "feedback": "구체적인 한국어 피드백"
+}}"""
 
 def _build_full_code_fallback_prompt(original_code: str, submitted_code: str, target_symbol: str) -> str:
     return f"""아래 원본 함수와 제출 코드 전체를 비교하여 채점해주세요.

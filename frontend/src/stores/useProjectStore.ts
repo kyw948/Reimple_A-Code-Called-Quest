@@ -92,9 +92,10 @@ export type SubmitResult = {
     actual: string | null;
     passed: boolean;
   }> | null;
+  grading_detail: string | null;
   stdout: string | null;
   stderr: string | null;
-  duration_ms: number;
+  duration_ms: number | null;
   saved_path: string | null;
   grading_method: "pytest" | "llm";
 };
