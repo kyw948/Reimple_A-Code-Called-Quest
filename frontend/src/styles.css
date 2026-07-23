@@ -1,10 +1,39 @@
 :root {
-  color: #202124;
-  background: #ffffff;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  --bg-page: #faf6f0;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fdf9f3;
+  --bg-input: #ffffff;
+  --bg-sidebar: #faf6f0;
+  --bg-badge: #f5efe6;
+  --text-primary: #2d2a26;
+  --text-secondary: #8a8578;
+  --text-muted: #b8b0a2;
+  --text-bright: #1a1814;
+  --accent: #e8732c;
+  --accent-hover: #d4641f;
+  --accent-light: rgba(232, 115, 44, 0.08);
+  --accent-green: #3a9e6e;
+  --accent-green-light: rgba(58, 158, 110, 0.08);
+  --accent-red: #d94452;
+  --accent-red-light: rgba(217, 68, 82, 0.08);
+  --accent-blue: #4a8fd4;
+  --border: #e8e0d4;
+  --border-light: #f0e8dc;
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --font-body: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .problem-list.grouped {
@@ -288,8 +317,12 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #ffffff;
-  color: #202124;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -1303,17 +1336,38 @@ button {
 }
 
 .practice-page {
-  display: grid;
-  grid-template-columns: minmax(220px, 20%) minmax(420px, 50%) minmax(280px, 30%);
+  display: flex;
+  width: 100%;
+  height: 100vh;
   gap: 16px;
-  min-height: 100vh;
+  overflow: hidden;
   padding: 20px;
 }
 
-.problem-sidebar,
-.practice-main,
-.result-sidebar {
+.problem-sidebar {
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+  flex-shrink: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.practice-main {
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.result-sidebar {
+  width: 300px;
+  min-width: 300px;
+  max-width: 300px;
+  flex-shrink: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .problem-sidebar,
@@ -1884,11 +1938,11 @@ button {
 }
 
 .problem-node {
-  display: grid;
+  display: flex;
   width: 100%;
-  grid-template-columns: 26px minmax(0, 1fr) 38px 24px;
-  gap: 6px;
+  min-width: 0;
   align-items: center;
+  gap: 8px;
   border-radius: 6px;
   padding: 8px;
   color: #374151;
@@ -1919,6 +1973,25 @@ button {
 .problem-node.not-generated:hover,
 .problem-node.not-generated.selected {
   opacity: 1;
+}
+
+.problem-node .status-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+}
+
+.problem-node .problem-symbol {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.problem-node .difficulty-stars {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .problem-node.passed .problem-symbol {
@@ -1993,12 +2066,16 @@ button {
 }
 
 .practice-main {
-  display: grid;
-  align-content: start;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   gap: 14px;
 }
 
 .problem-prompt {
+  flex: 0 0 auto;
+  max-height: 40vh;
+  overflow-y: auto;
   padding: 16px;
 }
 
@@ -2098,11 +2175,15 @@ button {
 }
 
 .editor-panel {
+  flex: 1 1 auto;
+  min-height: 300px;
+  height: 0;
   overflow: hidden;
 }
 
 .editor-actions {
   display: flex;
+  flex: 0 0 auto;
   gap: 10px;
 }
 
@@ -2253,7 +2334,7 @@ button {
 
 @media (max-width: 1000px) {
   .practice-page {
-    grid-template-columns: minmax(220px, 28%) minmax(0, 1fr);
+    display: flex;
   }
 
   .result-sidebar {
@@ -2267,8 +2348,22 @@ button {
 
 @media (max-width: 800px) {
   .practice-page {
-    grid-template-columns: 1fr;
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
     padding-top: 68px;
+  }
+
+  .practice-main {
+    min-width: 0;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .editor-panel {
+    height: 52vh;
+    min-height: 300px;
   }
 
   .file-menu-toggle {
@@ -2414,4 +2509,225 @@ button {
 
 .analysis-modules .module-file-list li::before {
   content: none;
+}
+
+
+/* SetupPage warm beige theme */
+.setup-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: start center;
+  padding: 10vh 20px 40px;
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+.setup-panel {
+  width: min(100%, 520px);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.setup-heading {
+  border-bottom: 0;
+  padding: 34px 32px 18px;
+  text-align: center;
+}
+
+.setup-heading h1 {
+  margin: 0;
+  color: var(--text-bright);
+  font-family: var(--font-heading);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.setup-heading p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.setup-tabs {
+  display: flex;
+  gap: 0;
+  margin: 12px 32px 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-badge);
+  padding: 4px;
+}
+
+.setup-tabs button {
+  flex: 1 1 0;
+  min-height: 40px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 10px 20px;
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+.setup-tabs button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.setup-tabs button.active {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+.setup-form {
+  display: grid;
+  gap: 20px;
+  padding: 28px 32px 32px;
+}
+
+.paper-inputs {
+  display: grid;
+  gap: 20px;
+}
+
+.setup-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.setup-form .field {
+  display: grid;
+  gap: 6px;
+}
+
+.setup-form .field span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.setup-form .field input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  font-size: 15px;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+
+.setup-form .field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.setup-form .field input::placeholder {
+  color: var(--text-muted);
+}
+
+.paper-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-hover);
+}
+
+.paper-preview strong {
+  color: var(--text-bright);
+}
+
+.paper-preview p {
+  color: var(--text-secondary);
+}
+
+.status-message {
+  border: 1px solid rgba(74, 143, 212, 0.28);
+  border-radius: var(--radius-sm);
+  color: var(--accent-blue);
+  background: rgba(74, 143, 212, 0.08);
+}
+
+.error-message {
+  border: 1px solid rgba(217, 68, 82, 0.28);
+  border-radius: var(--radius-sm);
+  color: var(--accent-red);
+  background: var(--accent-red-light);
+}
+
+.setup-form .setup-submit {
+  display: inline-flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 14px 24px;
+  color: #ffffff;
+  background: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    transform 0.1s;
+}
+
+.setup-form .setup-submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.setup-form .setup-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.setup-form .setup-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.setup-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  border-top-color: #ffffff;
+  border-radius: 999px;
+  animation: setup-spin 0.8s linear infinite;
+}
+
+.setup-progress-text {
+  margin: -8px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+@keyframes setup-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

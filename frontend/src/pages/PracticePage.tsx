@@ -597,7 +597,7 @@ export function PracticePage() {
 
             <section className="editor-panel">
               <Editor
-                height="52vh"
+                height="100%"
                 language="python"
                 theme="vs-dark"
                 value={editorCode}

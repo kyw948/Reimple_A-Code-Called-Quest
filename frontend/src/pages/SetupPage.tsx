@@ -283,7 +283,8 @@ export function SetupPage() {
     <main className="setup-page">
       <section className="setup-panel" aria-labelledby="setup-title">
         <div className="setup-heading">
-          <h1 id="setup-title">CodePractice</h1>
+          <h1 id="setup-title">Reimple</h1>
+          <p>a code called quest</p>
         </div>
 
         <div className="setup-tabs" role="tablist" aria-label="Repo input mode">
@@ -395,15 +396,19 @@ export function SetupPage() {
             </div>
           ) : null}
 
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting
-              ? statusMessage || "처리 중..."
-              : isPaperMode
-                ? "논문 분석"
-                : isGithubMode
-                  ? "Clone & 분석"
-                  : "분석"}
+          <button className="setup-submit" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? <span className="setup-spinner" aria-hidden="true" /> : null}
+            <span>
+              {isSubmitting
+                ? "분석 중..."
+                : isPaperMode
+                  ? "논문 분석"
+                  : isGithubMode
+                    ? "Clone & 분석"
+                    : "분석"}
+            </span>
           </button>
+          {isSubmitting && statusMessage ? <p className="setup-progress-text">{statusMessage}</p> : null}
         </form>
       </section>
     </main>
