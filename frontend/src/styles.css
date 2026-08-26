@@ -96,7 +96,7 @@
 
 .case-summary {
   margin: 0;
-  color: #16477f;
+  color: var(--accent);
   font-weight: 800;
 }
 
@@ -247,8 +247,8 @@
   min-height: 34px;
   border-radius: 6px;
   padding: 7px 10px;
-  color: #16477f;
-  background: #e8f1ff;
+  color: var(--accent);
+  background: var(--accent-light);
   font-size: 13px;
   font-weight: 750;
   cursor: pointer;
@@ -297,10 +297,10 @@
 
 .hint-markdown blockquote {
   margin: 12px 0 0;
-  border-left: 4px solid #bad2f2;
+  border-left: 4px solid var(--accent);
   padding: 8px 12px;
-  color: #16477f;
-  background: #f0f6ff;
+  color: var(--accent);
+  background: var(--accent-light);
 }
 
 .hint-modal > .empty-state,
@@ -453,12 +453,12 @@ button {
 }
 
 .paper-step-card.active {
-  border: 2px solid #2563eb;
+  border: 2px solid var(--accent);
 }
 
 .paper-step-card.completed {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+  border-color: rgba(58, 158, 110, 0.28);
+  background: var(--accent-green-light);
 }
 
 .paper-step-card.disabled {
@@ -498,11 +498,11 @@ button {
 }
 
 .paper-step-card.active .paper-step-index {
-  background: #2563eb;
+  background: var(--accent);
 }
 
 .paper-step-card.completed .paper-step-index {
-  background: #16a34a;
+  background: var(--accent-green);
 }
 
 .paper-step-state {
@@ -512,11 +512,11 @@ button {
 }
 
 .paper-step-state.completed {
-  color: #15803d;
+  color: var(--accent-green);
 }
 
 .paper-step-state.active {
-  color: #2563eb;
+  color: var(--accent);
 }
 
 .paper-step-state.disabled,
@@ -530,13 +530,17 @@ button {
   border-radius: 8px;
   padding: 10px 24px;
   color: #ffffff;
-  background: #2563eb;
+  background: var(--accent);
   font-weight: 700;
   cursor: pointer;
 }
 
 .paper-step-action.practice {
-  background: #16a34a;
+  background: var(--accent-green);
+}
+
+.paper-step-action:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 .paper-step-action:disabled {
@@ -552,7 +556,7 @@ button {
 
 .paper-step-details summary {
   width: fit-content;
-  color: #1666c5;
+  color: var(--accent);
   cursor: pointer;
   font-weight: 800;
 }
@@ -611,7 +615,7 @@ button {
 }
 
 .architecture-tree-name.core {
-  color: #1d4ed8;
+  color: var(--accent);
 }
 
 .architecture-tree-separator,
@@ -628,7 +632,7 @@ button {
 
 .compact-details summary {
   width: fit-content;
-  color: #1666c5;
+  color: var(--accent);
   cursor: pointer;
   font-weight: 800;
 }
@@ -664,7 +668,7 @@ button {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #16a34a, #22c55e);
+  background: var(--accent);
 }
 
 .codegen-file-list {
@@ -691,8 +695,8 @@ button {
 }
 
 .codegen-file-list li.current {
-  color: #1d4ed8;
-  background: #eff6ff;
+  color: var(--accent);
+  background: var(--accent-light);
 }
 
 .codegen-file-list li.pending {
@@ -758,8 +762,8 @@ button {
 }
 
 .field input:focus {
-  border-color: #1666c5;
-  box-shadow: 0 0 0 3px rgb(22 102 197 / 16%);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 .error-message {
@@ -774,11 +778,11 @@ button {
 
 .status-message {
   margin: 0;
-  border: 1px solid #bad2f2;
+  border: 1px solid rgba(232, 115, 44, 0.28);
   border-radius: 6px;
   padding: 10px 12px;
-  color: #16477f;
-  background: #f0f6ff;
+  color: var(--accent);
+  background: var(--accent-light);
   font-size: 14px;
 }
 
@@ -787,7 +791,7 @@ button {
   border-radius: 6px;
   padding: 10px 16px;
   color: #ffffff;
-  background: #1666c5;
+  background: var(--accent);
   font-weight: 700;
   cursor: pointer;
 }
@@ -897,7 +901,7 @@ button {
   margin-top: 12px;
   border-top: 1px solid #e5e8ef;
   border-radius: 0 0 6px 6px;
-  color: #16477f;
+  color: var(--accent);
   background: #f8fafc;
   font-size: 13px;
   font-weight: 800;
@@ -996,7 +1000,7 @@ button {
 .extension-selector input {
   width: 16px;
   height: 16px;
-  accent-color: #1666c5;
+  accent-color: var(--accent);
 }
 
 .extension-selector span {
@@ -1043,7 +1047,7 @@ button {
   border-radius: 6px;
   padding: 10px 18px;
   color: #ffffff;
-  background: #1666c5;
+  background: var(--accent);
   font-weight: 700;
   cursor: pointer;
 }
@@ -1055,7 +1059,7 @@ button {
 
 .status-text {
   margin: 0;
-  color: #1666c5;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -1086,7 +1090,7 @@ button {
   border-radius: 6px;
   padding: 8px 16px;
   color: #ffffff;
-  background: #1666c5;
+  background: var(--accent);
   font-weight: 700;
   cursor: pointer;
 }
@@ -1157,7 +1161,7 @@ button {
 }
 
 .assessment-main small {
-  color: #1666c5;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -1173,7 +1177,7 @@ button {
 .override-toggle input {
   width: 16px;
   height: 16px;
-  accent-color: #1666c5;
+  accent-color: var(--accent);
 }
 
 .recommended-symbols {
@@ -1201,8 +1205,8 @@ button {
 .recommended-symbols em {
   border-radius: 999px;
   padding: 2px 8px;
-  color: #16477f;
-  background: #e8f1ff;
+  color: var(--accent);
+  background: var(--accent-light);
   font-style: normal;
   font-weight: 750;
 }
@@ -1358,7 +1362,7 @@ button {
   min-width: 0;
   min-height: 0;
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: auto;
 }
 
 .result-sidebar {
@@ -1419,7 +1423,7 @@ button {
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #16a34a, #22c55e);
+  background: var(--accent);
   transition: width 180ms ease;
 }
 
@@ -1544,8 +1548,8 @@ button {
 .warmup-header span {
   border-radius: 999px;
   padding: 3px 9px;
-  color: #16477f;
-  background: #e8f1ff;
+  color: var(--accent);
+  background: var(--accent-light);
   font-size: 12px;
   font-weight: 800;
 }
@@ -1606,7 +1610,7 @@ button {
 .warmup-options input {
   width: 16px;
   height: 16px;
-  accent-color: #1666c5;
+  accent-color: var(--accent);
 }
 
 .warmup-card button {
@@ -1615,7 +1619,7 @@ button {
   border-radius: 6px;
   padding: 7px 12px;
   color: #ffffff;
-  background: #1666c5;
+  background: var(--accent);
   font-weight: 750;
   cursor: pointer;
 }
@@ -1686,7 +1690,7 @@ button {
 
 .architecture-flow-list li.active .architecture-flow-node {
   border-color: #86b7f3;
-  background: #eff6ff;
+  background: var(--accent-light);
   box-shadow: 0 0 0 3px rgb(22 102 197 / 12%);
 }
 
@@ -1706,7 +1710,7 @@ button {
 .architecture-flow-node em {
   border-radius: 999px;
   padding: 4px 9px;
-  color: #16477f;
+  color: var(--accent);
   background: #dbeafe;
   font-size: 12px;
   font-style: normal;
@@ -1870,7 +1874,7 @@ button {
 }
 
 .status-icon.unlocked {
-  color: #16477f;
+  color: var(--accent);
 }
 
 .status-icon.active {
@@ -2016,7 +2020,7 @@ button {
 }
 
 .role-callout {
-  color: #16477f;
+  color: var(--accent);
 }
 
 .locked-notice {
@@ -2041,7 +2045,7 @@ button {
 }
 
 .locked-notice button {
-  color: #16477f;
+  color: var(--accent);
   text-decoration: underline;
 }
 
@@ -2107,8 +2111,8 @@ button {
 }
 
 .problem-labels em {
-  color: #16477f;
-  background: #e8f1ff;
+  color: var(--accent);
+  background: var(--accent-light);
 }
 
 .markdown-content {
@@ -2193,7 +2197,7 @@ button {
   border-radius: 6px;
   padding: 9px 14px;
   color: #ffffff;
-  background: #1666c5;
+  background: var(--accent);
   font-weight: 700;
   cursor: pointer;
 }
@@ -2377,7 +2381,7 @@ button {
     border-radius: 6px;
     padding: 8px 12px;
     color: #ffffff;
-    background: #1666c5;
+    background: var(--accent);
     font-weight: 700;
   }
 
