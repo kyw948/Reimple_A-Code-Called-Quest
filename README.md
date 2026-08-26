@@ -12,6 +12,7 @@ GitHub repo 또는 arXiv 논문을 입력하면 프로젝트를 자동 분석하
 - **논문 기반**: arXiv/PDF → Paper2Code 방식으로 참조 코드 생성 → 문제 생성
 - **AI 채점**: pytest 또는 LLM 기반 코드 비교 채점
 - **단계별 학습**: PaperBench 영감의 문제 트리 + 의존 관계 해금
+
 ---
 
 ## 핵심 기능
@@ -77,56 +78,103 @@ practice_root/
 
 ---
 
+### 논문 기반 모드
+
+arXiv URL 또는 PDF를 입력하면 Paper2Code 방식으로 논문을 분석하고, 참조 코드를 자동 생성한 뒤, 그 코드로 연습 문제를 만듭니다.
+
+**Step 1. 구조 설계** — 논문에서 핵심 컴포넌트를 추출하고 파일 구조와 구현 순서를 설계합니다.
+
+- 핵심 컴포넌트 추출 (Attention, Embedding, Backbone 등)
+- 파일 구조 + 클래스/함수 설계
+- 의존성 기반 구현 순서 결정
+
+**Step 2. 코드 생성** — 설계를 기반으로 의존 순서대로 파일을 하나씩 생성합니다. 각 파일은 이전에 생성된 파일을 참조하여 import 일관성을 유지합니다.
+
+**Step 3. 연습** — 생성된 코드가 repo처럼 동작하여 코드 기반 모드와 동일한 흐름으로 연습합니다.
+
+<img src="./figure/paper.png" alt="논문 모드 구조 설계와 코드 생성 진행 화면">
+
+---
+
+### 문제 트리 + 해금
+
+PaperBench에서 영감을 받은 계층적 문제 구조. 기초 모듈을 풀어야 상위 모듈이 해금됩니다.
+
+- 모듈별 문제 그룹 (model / training / data)
+- 🔓 풀 수 있는 문제 / 🔒 잠긴 문제 / ✅ 완료된 문제
+- 전체 진행도 + 모듈별 진행도
+
+<img src="./figure/tree.png" alt="문제 트리와 잠금/해금 화면">
+
+---
+
+### LLM 채점 + 힌트
+
+pytest가 없는 프로젝트에서는 LLM이 원본 코드와 비교하여 채점합니다. 막히면 3단계 힌트를 제공합니다.
+
+- **pytest 채점**: 테스트 파일이 있으면 격리 환경에서 실행
+- **LLM 채점**: 테스트가 없으면 원본 코드와 비교 판정
+- **힌트**: 레벨 1 (개념) → 레벨 2 (입출력) → 레벨 3 (알고리즘 방향)
+
+---
+
+### 몸풀기 퀴즈
+
+프로젝트 분석이 진행되는 동안 논문/프로젝트 관련 객관식 퀴즈로 배경 지식을 점검합니다.
+
+<img src="./figure/warmup.png" alt="몸풀기 퀴즈 화면">
+
+---
+
 ## 시작하기
 
 ### 사전 준비
 
-- Python 3.11+
+- Python 3.10+
 - Node.js 18+
 
-### 설치
+### 빠른 시작 (권장)
 
 ```bash
 git clone https://github.com/kyw948/Reimple.git
 cd Reimple
+```
 
+**Windows**
+```powershell
+./start.ps1
+```
+
+**Mac / Linux**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+첫 실행 시 Gemini API 키 입력을 요청합니다.
+[Google AI Studio](https://aistudio.google.com/apikey)에서 무료 발급 가능.
+
+브라우저에서 http://localhost:5173 접속.
+
+### 수동 설치
+
+```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+echo "GEMINI_API_KEY=your_key" > .env
 
 cd ../frontend
 npm install
 ```
 
-### 환경 변수
-
-`backend/.env.example`을 복사해 `backend/.env`를 만들고 값을 채웁니다.
-
-```bash
-cd backend
-cp .env.example .env   # Windows: copy .env.example .env
-```
-
-`GEMINI_API_KEY`는 [Google AI Studio](https://aistudio.google.com/apikey)에서 발급합니다.  
-프로젝트 분석, 문제 생성, 힌트, LLM 채점, 논문 모드에 필요합니다.
-
-```env
-DATABASE_URL=sqlite:///./app.db
-SYNTAX_TIMEOUT_SECONDS=5
-RUNNER_TEST_TIMEOUT_SECONDS=10
-RUNNER_SUBMIT_TIMEOUT_SECONDS=30
-FRONTEND_ORIGIN=http://localhost:5173
-GEMINI_API_KEY=your-gemini-api-key-here
-```
-
-> **주의:** `backend/.env`는 git에 올리지 마세요. API 키가 포함됩니다.
-
-### 실행
+### 수동 실행
 
 ```bash
 # 터미널 1 — 백엔드
 cd backend
+source .venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 
 # 터미널 2 — 프론트엔드
@@ -141,30 +189,36 @@ npm run dev
 ## 프로젝트 구조
 
 ```
-quest/
+Reimple/
 ├── backend/
 │   └── app/
-│       ├── main.py                   # FastAPI 엔트리
-│       ├── api/                      # 라우트 핸들러
-│       ├── core/                     # 설정, 에러
-│       ├── db/                       # SQLite 모델
+│       ├── main.py                    # FastAPI 엔트리
+│       ├── core/                      # 설정, 에러
+│       ├── db/                        # SQLite
 │       └── services/
-│           ├── repo_analyzer.py      # 파일 트리 + 확장자 통계
-│           ├── problem_generator.py  # AST 분석 + 문제 생성
-│           ├── test_matcher.py       # 테스트 파일 매칭
-│           ├── runner.py             # pytest 실행 + 채점
-│           └── file_manager.py      # 연습 폴더 파일 관리
+│           ├── project_analyzer.py    # 프로젝트 분석 (Step 1~3)
+│           ├── file_assessor.py       # 파일 적합성 분석
+│           ├── problem_generator.py   # 문제 생성
+│           ├── problem_tree.py        # 문제 트리 + 해금
+│           ├── paper_parser.py        # 논문 PDF 파싱
+│           ├── paper_planner.py       # Paper2Code Planning
+│           ├── paper_codegen.py       # Paper2Code Coding
+│           ├── llm_client.py          # Gemini API
+│           ├── llm_grader.py          # LLM 채점
+│           ├── runner.py              # pytest 실행
+│           ├── warmup_generator.py    # 몸풀기 퀴즈
+│           └── hint_generator.py      # 힌트 생성
 ├── frontend/
 │   └── src/
 │       ├── pages/
-│       │   ├── SetupPage.tsx         # Repo 경로 입력
-│       │   ├── AnalyzePage.tsx       # 파일 트리 + 문제 생성
-│       │   └── PracticePage.tsx      # 에디터 + 채점
-│       ├── components/               # UI 컴포넌트
-│       ├── stores/                   # Zustand 상태
-│       └── api/                      # API 클라이언트
-└── samples/
-    └── python_basic/                 # 테스트용 샘플 repo
+│       │   ├── SetupPage.tsx          # 입력 (Git / 논문)
+│       │   ├── AnalyzePage.tsx        # 분석 결과 + 구조 설계
+│       │   └── PracticePage.tsx       # 에디터 + 채점
+│       └── stores/                    # Zustand 상태
+├── docs/                              # 설계 문서
+├── samples/                           # 테스트용 샘플 repo
+├── start.ps1                          # Windows 실행
+└── start.sh                           # Mac/Linux 실행
 ```
 
 ---
@@ -175,9 +229,17 @@ quest/
 |------|------|
 | 매칭된 테스트 전체 통과 | ✅ 연습 폴더에 저장 |
 | 테스트 실패 | ❌ 저장 안 함, stderr 표시 |
+| 테스트 없음 (LLM 채점) | LLM이 원본 코드와 비교 판정 |
 | 문법 / import 오류 | ❌ 저장 안 함, 오류 표시 |
 | 타임아웃 (30초 초과) | ❌ 저장 안 함, 타임아웃 표시 |
 | 파일 이미 존재, `overwrite=false` | ⚠️ 통과했지만 덮어쓰지 않음 |
+
+---
+
+## 참고 논문
+
+- [Paper2Code](https://github.com/going-doer/Paper2Code) (ICLR 2026) — 논문→코드 변환 파이프라인. 코드 모드에서 역방향, 논문 모드에서 정방향 적용.
+- [PaperBench](https://github.com/openai/preparedness-paper-bench) (OpenAI, 2025) — 계층적 rubric 구조. 문제 트리, 가중치, 해금 시스템에 적용.
 
 ---
 
@@ -191,5 +253,6 @@ MIT License
 
 - [Monaco Editor](https://microsoft.github.io/monaco-editor/) — 코드 에디터
 - [pytest](https://pytest.org/) — 테스트 실행 및 채점
+- [Google Gemini](https://ai.google.dev/) — LLM
 - *A Tribe Called Quest*
 - Paper2Code (https://github.com/going-doer/paper2code, https://arxiv.org/abs/2504.17192)
