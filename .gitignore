@@ -1,7 +1,9 @@
 # env / secrets
 .env
 *.env
+!*.env.example
 backend/.env
+!backend/.env.example
 
 # python
 __pycache__/
@@ -37,10 +39,8 @@ generated/
 .DS_Store
 Thumbs.db
 .vscode/
-.idea/f i g u r e / c a p t u r e _ r e a d m e . p y 
-.idea/figure/capture_readme.py
-
-.CURSOR_RULES.md
-.CLAUDE.md
- 
- 
+# local screenshot artifacts
+figure/_practice_tmp/
+figure/_flow_*.png
+figure/*.log
+figure/capture_run.log

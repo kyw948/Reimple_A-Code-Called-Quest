@@ -38,9 +38,10 @@ GitHub repo 또는 arXiv 논문을 입력하면 프로젝트를 자동 분석하
 
 ### 문제 생성
 
-Python AST로 각 `.py` 파일을 분석해 문제로 적합한 함수를 선별합니다. LLM 없이 동작합니다.
+Python AST로 각 `.py` 파일을 분석해 문제로 적합한 함수를 선별하고, Gemini로 문제 설명과 starter code를 생성합니다.
 
-- type hint, docstring, return 문 기반으로 최적 함수 선택
+- type hint, docstring, return 문 기반으로 최적 함수 선택 (AST)
+- LLM으로 문제 설명·starter code 생성 (키 없으면 기본 템플릿 fallback)
 - 선택된 함수 body만 `raise NotImplementedError`로 교체
 - 나머지 함수, 클래스, import는 원본 그대로 유지
 - 문제 생성 전 원본 repo의 pytest 통과 여부 검증
@@ -100,7 +101,15 @@ npm install
 
 ### 환경 변수
 
-`backend/.env` 파일을 만들고 아래 값을 넣습니다.
+`backend/.env.example`을 복사해 `backend/.env`를 만들고 값을 채웁니다.
+
+```bash
+cd backend
+cp .env.example .env   # Windows: copy .env.example .env
+```
+
+`GEMINI_API_KEY`는 [Google AI Studio](https://aistudio.google.com/apikey)에서 발급합니다.  
+프로젝트 분석, 문제 생성, 힌트, LLM 채점, 논문 모드에 필요합니다.
 
 ```env
 DATABASE_URL=sqlite:///./app.db
@@ -108,7 +117,10 @@ SYNTAX_TIMEOUT_SECONDS=5
 RUNNER_TEST_TIMEOUT_SECONDS=10
 RUNNER_SUBMIT_TIMEOUT_SECONDS=30
 FRONTEND_ORIGIN=http://localhost:5173
+GEMINI_API_KEY=your-gemini-api-key-here
 ```
+
+> **주의:** `backend/.env`는 git에 올리지 마세요. API 키가 포함됩니다.
 
 ### 실행
 
@@ -179,3 +191,4 @@ MIT License
 
 - [Monaco Editor](https://microsoft.github.io/monaco-editor/) — 코드 에디터
 - [pytest](https://pytest.org/) — 테스트 실행 및 채점
+- *A Tribe Called Quest*
