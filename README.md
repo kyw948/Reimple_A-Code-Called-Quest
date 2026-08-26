@@ -192,3 +192,4 @@ MIT License
 - [Monaco Editor](https://microsoft.github.io/monaco-editor/) — 코드 에디터
 - [pytest](https://pytest.org/) — 테스트 실행 및 채점
 - *A Tribe Called Quest*
+- Paper2Code (https://github.com/going-doer/paper2code, https://arxiv.org/abs/2504.17192)
